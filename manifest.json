@@ -1,8 +1,8 @@
 {
-  "name": "NaviApp - Fahrrad & Wandern",
-  "short_name": "NaviApp",
-  "description": "Premium Outdoor-Navigation für Fahrradtouren und Wanderungen",
-  "start_url": "./index.html",
+  "name": "Vialo",
+  "short_name": "Vialo",
+  "description": "Routen für Wandern & Fahrrad",
+  "start_url": "https://vialo.benedrive.de",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#ABC1AD",
