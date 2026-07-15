@@ -2,7 +2,7 @@
   "name": "Vialo",
   "short_name": "Vialo",
   "description": "Routen für Wandern & Fahrrad",
-  "start_url": "https://vialo.benedrive.de",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#ABC1AD",
