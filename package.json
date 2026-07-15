@@ -1,0 +1,13 @@
+{
+  "name": "naviapp",
+  "version": "1.0.0",
+  "description": "Progressive Web App für Fahrrad- und Wandernavigation",
+  "main": "js/app.js",
+  "scripts": {
+    "dev": "npx -y serve -p 5000 ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}

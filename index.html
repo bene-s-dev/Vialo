@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NaviApp - Fahrrad & Wandern</title>
+  
+  <!-- PWA Manifest & Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ABC1AD">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <!-- Google Fonts (Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  
+  <!-- App Shell -->
+  <div id="app-container">
+    
+    <!-- Mobile Top Navigation Bar -->
+    <header id="mobile-header" class="glass">
+      <button id="toggle-sidebar-btn" aria-label="Menü öffnen">
+        <i data-lucide="menu"></i>
+      </button>
+      <div class="logo">
+        <span class="brand-name">NaviApp</span>
+        <span id="offline-badge" class="badge offline hidden">Offline</span>
+      </div>
+      <button id="mobile-settings-btn" aria-label="Einstellungen">
+        <i data-lucide="settings"></i>
+      </button>
+    </header>
+
+    <!-- Sidebar / Panel for Desktop & Mobile Toggle -->
+    <aside id="sidebar" class="glass">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i data-lucide="compass" class="brand-icon"></i>
+          <span class="brand-name">NaviApp</span>
+          <span id="desktop-offline-badge" class="badge offline hidden">Offline</span>
+        </div>
+        <button id="close-sidebar-btn" class="mobile-only">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="sidebar-content">
+
+
+        <!-- Section: Route Planning -->
+        <section class="section">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">Routenplanung</h3>
+            <button id="clear-route-btn" class="btn-round-reset" title="Zurücksetzen">
+              <i data-lucide="rotate-ccw" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+          <div class="input-group">
+            <div class="input-row">
+              <i data-lucide="map-pin" class="input-icon start"></i>
+              <input type="text" id="start-input" placeholder="Startpunkt suchen..." autocomplete="off">
+              <button id="my-location-start-btn" title="Aktuellen Standort verwenden">
+                <i data-lucide="locate"></i>
+              </button>
+            </div>
+            <div id="start-search-results" class="search-results-box hidden"></div>
+            
+            <div class="input-row">
+              <i data-lucide="navigation-2" class="input-icon dest"></i>
+              <input type="text" id="dest-input" placeholder="Zielpunkt suchen..." autocomplete="off">
+              <button id="pick-on-map-btn" title="Ziel auf Karte wählen">
+                <i data-lucide="map"></i>
+              </button>
+            </div>
+            <div id="dest-search-results" class="search-results-box hidden"></div>
+          </div>
+
+          <!-- Wegpunkte Liste -->
+          <div class="route-points-container" style="margin-top: 10px; margin-bottom: 5px;">
+            <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dimmed); margin-bottom: 6px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;"><i data-lucide="list-ordered" style="width: 14px; height: 14px;"></i> Wegpunkte</h4>
+            <ul id="route-points-list" class="saved-list" style="max-height: 150px; overflow-y: auto;">
+              <li class="empty-msg" style="font-size: 0.78rem; text-align: center; color: var(--text-dimmed); padding: 8px 0;">Klicke auf die Karte oder suche Orte, um Wegpunkte hinzuzufügen.</li>
+            </ul>
+          </div>
+
+          <!-- Profile Selection -->
+          <div class="profile-selector">
+            <button class="profile-btn active" data-profile="cycling-regular" title="Gravel / Fahrrad">
+              <i data-lucide="bike"></i>
+              <span>Gravel</span>
+            </button>
+            <button class="profile-btn" data-profile="foot-hiking" title="Wandern">
+              <i data-lucide="footprints"></i>
+              <span>Wandern</span>
+            </button>
+          </div>
+
+          <div class="action-buttons" style="margin-top: 14px;">
+            <button id="calculate-route-btn" class="btn btn-accent btn-full">
+              <i data-lucide="route"></i> Route berechnen
+            </button>
+          </div>
+
+        </section>
+
+        <!-- Section: Route Stats / Info -->
+        <section id="route-info-section" class="section hidden">
+          <h3>Tour-Informationen</h3>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="label">Distanz</span>
+              <span id="metric-distance" class="value">0.0 km</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Dauer</span>
+              <span id="metric-duration" class="value">00:00</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Aufstieg</span>
+              <span id="metric-elevation-gain" class="value">+0 m</span>
+            </div>
+            <div class="metric-card">
+              <span class="label">Abstieg</span>
+              <span id="metric-elevation-loss" class="value">-0 m</span>
+            </div>
+          </div>
+
+          <!-- Surface Breakdown -->
+          <div class="surface-container">
+            <h4>Bodenbeläge</h4>
+            <div id="surface-progress-bar" class="progress-bar"></div>
+            <div id="surface-list" class="surface-list"></div>
+          </div>
+
+          <!-- Höhenprofil -->
+          <div class="elevation-profile-container" style="margin-top: 15px; margin-bottom: 15px;">
+            <h4>Höhenprofil</h4>
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: 10px; padding: 12px; margin-top: 6px; position: relative;">
+              <canvas id="elevation-profile-canvas" style="width: 100%; height: 120px; display: block;"></canvas>
+            </div>
+          </div>
+
+          <!-- GPX Export -->
+          <div class="action-buttons">
+            <button id="export-gpx-btn" class="btn btn-primary">
+              <i data-lucide="download"></i> GPX exportieren
+            </button>
+          </div>
+        </section>
+
+        <!-- Section: GPX Handling & Saved Routes -->
+        <section class="section">
+          <h3>GPX-Touren & Favoriten</h3>
+          <div class="gpx-import-zone">
+            <input type="file" id="gpx-file-input" accept=".gpx" class="hidden">
+            <button id="import-gpx-btn" class="btn btn-secondary btn-full">
+              <i data-lucide="upload"></i> GPX importieren
+            </button>
+          </div>
+
+          <div class="saved-routes-container">
+            <h4>Gespeicherte Touren</h4>
+            <ul id="saved-routes-list" class="saved-list">
+              <li class="empty-msg">Keine gespeicherten Touren vorhanden.</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <!-- Sidebar Footer / Settings Button on Desktop -->
+      <div class="sidebar-footer">
+        <button id="desktop-settings-btn" class="btn btn-secondary btn-full">
+          <i data-lucide="settings"></i> Einstellungen & Keys
+        </button>
+      </div>
+    </aside>
+
+    <!-- Map Container -->
+    <main id="map-container">
+      <div id="map"></div>
+
+      <!-- Floating Controls on Map -->
+      <div class="map-controls">
+        <button id="zoom-in-btn" class="map-btn" title="Vergrößern">
+          <i data-lucide="plus"></i>
+        </button>
+        <button id="zoom-out-btn" class="map-btn" title="Verkleinern">
+          <i data-lucide="minus"></i>
+        </button>
+        <button id="gps-track-btn" class="map-btn" title="Standort verfolgen">
+          <i data-lucide="navigation"></i>
+        </button>
+        <button id="map-theme-btn" class="map-btn" title="Karten-Optionen">
+          <i data-lucide="layers"></i>
+        </button>
+        <div id="map-theme-menu" class="theme-menu glass hidden" style="width: 220px; padding: 14px; display: flex; flex-direction: column; gap: 12px; right: 54px; top: 0; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border-radius: 12px;">
+          <!-- Karten-Typ -->
+          <div>
+            <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-dimmed); margin-bottom: 6px; letter-spacing: 0.5px; font-weight: 600;">Karten-Typ</h4>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <button data-layer="osm" class="layer-option active" style="width: 100%; text-align: left; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: none; font-family: inherit; cursor: pointer;">OpenStreetMap</button>
+              <button data-layer="opentopo" class="layer-option" style="width: 100%; text-align: left; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: none; font-family: inherit; cursor: pointer;">OpenTopoMap</button>
+              <button data-layer="cyclosm" class="layer-option" style="width: 100%; text-align: left; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: none; font-family: inherit; cursor: pointer;">CyclOSM (Fahrrad)</button>
+            </div>
+          </div>
+          <!-- Overlays / POIs -->
+          <div style="border-top: 1px solid var(--color-border); padding-top: 10px;">
+            <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-dimmed); margin-bottom: 8px; letter-spacing: 0.5px; font-weight: 600;">Karten-Overlays (POIs)</h4>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label class="poi-menu-item" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main); user-select: none;">
+                <input type="checkbox" class="poi-checkbox" data-poi="drinking_water" style="width: auto; margin: 0; cursor: pointer;">
+                <i data-lucide="droplet" style="width: 14px; height: 14px; color: #4aa3df;"></i>
+                <span>Trinkwasser</span>
+              </label>
+              <label class="poi-menu-item" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main); user-select: none;">
+                <input type="checkbox" class="poi-checkbox" data-poi="shelter" style="width: auto; margin: 0; cursor: pointer;">
+                <i data-lucide="home" style="width: 14px; height: 14px; color: #e74c3c;"></i>
+                <span>Schutzhütten</span>
+              </label>
+              <label class="poi-menu-item" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main); user-select: none;">
+                <input type="checkbox" class="poi-checkbox" data-poi="viewpoint" style="width: auto; margin: 0; cursor: pointer;">
+                <i data-lucide="eye" style="width: 14px; height: 14px; color: #f1c40f;"></i>
+                <span>Aussichtspunkte</span>
+              </label>
+              <label class="poi-menu-item" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main); user-select: none;">
+                <input type="checkbox" class="poi-checkbox" data-poi="bicycle_repair" style="width: auto; margin: 0; cursor: pointer;">
+                <i data-lucide="wrench" style="width: 14px; height: 14px; color: #2ecc71;"></i>
+                <span>Reparatur-Stationen</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Navigation Banner (Turn-by-Turn Overlay) -->
+      <div id="nav-instruction-banner" class="nav-banner glass hidden">
+        <div class="nav-icon-container">
+          <i id="nav-instruction-icon" data-lucide="arrow-up-right"></i>
+        </div>
+        <div class="nav-text-container">
+          <span id="nav-instruction-dist" class="nav-dist">In 150m</span>
+          <span id="nav-instruction-text" class="nav-text">Rechts abbiegen auf Waldweg</span>
+        </div>
+        <button id="stop-nav-btn" class="btn-close-nav" title="Navigation beenden">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </main>
+
+    <!-- Mobile Bottom Sheet (Draggable Drawer for Info/Navigation) -->
+    <div id="bottom-sheet" class="glass mobile-only">
+      <div class="bottom-sheet-handle"></div>
+      <div class="bottom-sheet-content">
+        <!-- Short Summary Row (Visible when collapsed) -->
+        <div id="bottom-sheet-summary" class="sheet-summary">
+          <div class="summary-details">
+            <span id="sheet-summary-dist" class="summary-val">0.0 km</span>
+            <span id="sheet-summary-dur" class="summary-val">00:00</span>
+          </div>
+          <button id="sheet-action-btn" class="btn btn-accent btn-sm">Start</button>
+        </div>
+
+        <!-- Scrollable details (Visible when expanded) -->
+        <div id="bottom-sheet-details" class="sheet-details hidden">
+          <!-- Populated dynamically with the active sidebar-content sections for mobile -->
+          <div id="mobile-route-details"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal (API Keys & Config) -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card glass">
+      <div class="modal-header">
+        <h3>Einstellungen</h3>
+        <button id="close-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="routing-engine-select">Routing-Dienst</label>
+          <select id="routing-engine-select" style="background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.92rem; width: 100%;">
+            <option value="brouter" selected>BRouter</option>
+            <option value="ors">OpenRouteService</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>BRouter Routen-Optionen (Toggles)</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-allow-steps" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-allow-steps" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Treppen erlauben</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-allow-ferries" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-allow-ferries" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Fähren erlauben</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-ignore-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-ignore-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Radrouten ignorieren</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-stick-to-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-stick-to-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Radrouten bevorzugen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-use-proposed-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-use-proposed-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Geplante Radwege nutzen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-avoid-unsafe" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-avoid-unsafe" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Hauptstraßen meiden</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-add-beeline" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-add-beeline" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Luftlinie aktivieren</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-noise" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-noise" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Ruhige Route (Lärm meiden)</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-river" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-river" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Wasserläufe bevorzugen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-forest" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-forest" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Wald & Parks bevorzugen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-town" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-town" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Städte umgehen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-traffic" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-traffic" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Verkehr berücksichtigen</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="brouter-consider-elevation" style="width: auto; margin: 0; cursor: pointer;">
+              <label for="brouter-consider-elevation" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Höhenmeter meiden</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="offline-tiles-checkbox" checked>
+          <label for="offline-tiles-checkbox">Geladene Kartenkacheln offline speichern</label>
+        </div>
+
+        <div class="form-group">
+          <label>Karten-Cache Status</label>
+          <div class="cache-status-info">
+            <span id="cache-size-label">Berechne...</span>
+            <button id="clear-cache-btn" class="btn btn-secondary btn-sm">Cache leeren</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="save-settings-btn" class="btn btn-accent">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@0.300.0/dist/umd/lucide.min.js"></script>
+
+  <!-- ES6 App Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
