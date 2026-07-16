@@ -21,7 +21,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not set on Vercel.' });
   }
 
-  const { lengthMin, lengthMax, timeMin, timeMax, effort, startLocation, profile, freeText } = req.body;
+  const { lengthMin, lengthMax, timeMin, timeMax, effort, startLocation, startLat, startLon, profile, freeText, poiCandidates } = req.body;
+  const sLat = parseFloat(startLat) || 51.1657;
+  const sLon = parseFloat(startLon) || 10.4515;
 
   const systemPrompt = `
 Du bist das Routing-Gehirn einer Navigations-App. Der Nutzer möchte eine Route planen.
@@ -30,24 +32,32 @@ Eingestellte Parameter des Nutzers:
 - Gewünschte Länge: ${lengthMin || 5} bis ${lengthMax || 25} km
 - Gewünschte Dauer/Zeit: ${timeMin || 60} bis ${timeMax || 240} Minuten (Bereich: 30 Min bis 10 Std)
 - Gewünschte Anstrengung: ${effort || 'Mittel'} (Leicht / Mittel / Schwer)
-- Aktueller Startpunkt: "${startLocation || 'Unbekannter Startort'}"
+- Aktueller Startpunkt: "${startLocation || 'Unbekannter Startort'}" (${sLat}, ${sLon})
 - Aktuelles Profil: "${profile || 'Gravel'}"
 
 Zusätzlicher Freitext-Wunsch des Nutzers:
 "${freeText || ''}"
 
+Kandidaten-Liste realer POIs in der Nähe des Startorts:
+${JSON.stringify(poiCandidates || [])}
+
 Deine Aufgabe:
-1. Analysiere den Freitext und die Parameter. Bringe die gewünschte Länge (km) und die gewünschte Zeit in ein realistisches Verhältnis zur gewählten Aktivität (z. B. schafft man beim Wandern in 2 Stunden ca. 8–10 km, beim Fahrradfahren eher 25–35 km). Passe die Route so an, dass beide Regler-Werte logisch erfüllt werden.
-2. Wähle 3 bis 5 logische Zwischenstationen (POIs, Parks, Sehenswürdigkeiten) aus, die zusammen mit dem Start- und Zielpunkt eine passende Runde ergeben.
-3. Wenn die Anstrengung "Leicht" ist, meide steile Berge. Wenn sie "Schwer" ist, plane gerne Aussichtspunkte auf Bergen ein.
-4. Verwende im Array "semantic_waypoints" nur reale Ortsnamen inklusive Stadt/Region (z.B. "Schlossberg, Freiburg"). Keine Geokoordinaten!
+1. Analysiere den Freitext und die Parameter. Bringe die gewünschte Länge (km) und die gewünschte Zeit in ein realistisches Verhältnis zur gewählten Aktivität.
+2. Wähle aus den bereitgestellten realen POIs (Kandidaten-Liste) die passendsten 2 bis 5 POIs aus, die am besten zu dem Wunsch des Nutzers passen.
+3. Sortiere sie in eine logische Reihenfolge für eine Rundtour, die am Startort beginnt und endet.
+4. Verwende für die Wegpunkte EXAKT die Namen und Koordinaten aus der bereitgestellten POI-Kandidaten-Liste oder dem Startort.
 5. Wähle das passende BRouter-Profil (z.B. "hiking" für schwere Wanderungen, "trekking" für leichte, "bicycle" für Radtouren).
 
 Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
 {
-  "chat_reply": "Eine kurze Erklärung auf Deutsch, warum du diese Route passend zu den Filtern (Länge, Zeit, Anstrengung) und dem Wunsch gewählt hast.",
+  "chat_reply": "Eine kurze Erklärung auf Deutsch, warum du diese Route passend zu den Filtern und dem Wunsch gewählt hast.",
   "brouter_profile": "hiking | bicycle | trekking",
-  "semantic_waypoints": ["Startort", "POI 1", "POI 2", "Startort"]
+  "semantic_waypoints": [
+    { "name": "${startLocation}", "lat": ${sLat}, "lon": ${sLon}, "description": "Startpunkt" },
+    { "name": "Name des gewählten POIs 1", "lat": 51.1850, "lon": 10.4620, "description": "Erklärung..." },
+    { "name": "Name des gewählten POIs 2", "lat": 51.1920, "lon": 10.4710, "description": "Erklärung..." },
+    { "name": "${startLocation}", "lat": ${sLat}, "lon": ${sLon}, "description": "Zielpunkt" }
+  ]
 }
 `;
 

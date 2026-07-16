@@ -9,6 +9,7 @@ import { Storage } from './storage.js';
 import { GPX } from './gpx.js';
 import { Geolocation } from './geolocation.js';
 import { POI } from './poi.js';
+import { Overpass } from './overpass.js';
 
 // Application State
 const State = {
@@ -29,7 +30,9 @@ const State = {
   brouterOptions: {},
   magicStartCoord: null,
   longPressCoord: null,
-  longPressTriggered: false
+  longPressTriggered: false,
+  overpassLayerGroup: null,
+  overpassRoutes: [] // Array of loaded Overpass route objects
 };
 
 // DOM Elements
@@ -206,13 +209,19 @@ const DOM = {
   magicResultReply: document.getElementById('magic-result-reply'),
   magicResultWaypoints: document.getElementById('magic-result-waypoints'),
   magicResultApplyBtn: document.getElementById('magic-result-apply-btn'),
-  magicResultEditBtn: document.getElementById('magic-result-edit-btn')
+  magicResultEditBtn: document.getElementById('magic-result-edit-btn'),
+  searchMapRoutesBtn: document.getElementById('search-map-routes-btn'),
+  overpassPanel: document.getElementById('overpass-routes-panel'),
+  closeOverpassBtn: document.getElementById('close-overpass-btn'),
+  overpassLoading: document.getElementById('overpass-loading'),
+  overpassRouteListUl: document.getElementById('overpass-route-list-ul')
 };
 
 // Init application
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize Leaflet Map
   MapController.init();
+  State.overpassLayerGroup = L.layerGroup().addTo(MapController.map);
   
   // Load settings (BRouter Profiles & Mappings)
   loadSettings();
@@ -1165,6 +1174,42 @@ function setupEventListeners() {
   DOM.sheetActionBtn.addEventListener('click', toggleNavigation);
   DOM.stopNavBtn.addEventListener('click', stopNavigation);
   DOM.gpsTrackBtn.addEventListener('click', toggleGPSTracking);
+  // Overpass Route Search Action Event Listeners
+  const updateSearchBtnState = () => {
+    if (!DOM.searchMapRoutesBtn) return;
+    const currentZoom = MapController.map.getZoom();
+    if (currentZoom < 13) {
+      DOM.searchMapRoutesBtn.classList.add('disabled');
+      DOM.searchMapRoutesBtn.title = 'Bitte zoome weiter hinein, um die Suche zu aktivieren.';
+    } else {
+      DOM.searchMapRoutesBtn.classList.remove('disabled');
+      DOM.searchMapRoutesBtn.title = 'Nach Wander- und Fahrradrouten im Kartenausschnitt suchen';
+    }
+  };
+
+  if (DOM.searchMapRoutesBtn) {
+    DOM.searchMapRoutesBtn.addEventListener('click', () => {
+      if (DOM.searchMapRoutesBtn.classList.contains('disabled')) {
+        alert('Der Kartenausschnitt ist zu groß. Bitte zoome weiter hinein (mindestens Zoom-Stufe 13), um Routen zu suchen.');
+        return;
+      }
+      performOverpassSearch();
+    });
+  }
+
+  if (DOM.closeOverpassBtn) {
+    DOM.closeOverpassBtn.addEventListener('click', () => {
+      DOM.overpassPanel.classList.add('hidden');
+      if (State.overpassLayerGroup) {
+        State.overpassLayerGroup.clearLayers();
+      }
+    });
+  }
+
+  MapController.map.on('zoomend', updateSearchBtnState);
+  // Initial run to set correct state based on initial zoom
+  setTimeout(updateSearchBtnState, 200);
+
   DOM.zoomInBtn.addEventListener('click', () => MapController.map.zoomIn());
   DOM.zoomOutBtn.addEventListener('click', () => MapController.map.zoomOut());
 
@@ -1435,6 +1480,121 @@ function setupAddressSearch(inputEl, resultsEl, onSelectCallback) {
     }
   });
 }
+
+/**
+ * Overpass API route search operations
+ */
+async function performOverpassSearch() {
+  if (!State.overpassLayerGroup) return;
+
+  // Clear previous layers & UI list
+  State.overpassLayerGroup.clearLayers();
+  DOM.overpassRouteListUl.innerHTML = '';
+  State.overpassRoutes = [];
+
+  // Show panel and loading spinner
+  DOM.overpassPanel.classList.remove('hidden');
+  DOM.overpassLoading.classList.remove('hidden');
+
+  const bounds = MapController.map.getBounds();
+
+  try {
+    const routes = await Overpass.searchRoutes(bounds);
+    DOM.overpassLoading.classList.add('hidden');
+    State.overpassRoutes = routes;
+
+    if (routes.length === 0) {
+      DOM.overpassRouteListUl.innerHTML = '<li style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 20px 0;">Keine Routen in diesem Kartenausschnitt gefunden.</li>';
+      return;
+    }
+
+    // Render routes
+    routes.forEach((route, index) => {
+      // Create Leaflet Polyline/MultiPolyline
+      // Cycle is blue, hiking is emerald green
+      const color = route.type === 'Fahrrad' ? '#3b82f6' : '#10b981';
+      
+      route.polyline = L.polyline(route.geometry, {
+        color: color,
+        weight: 4,
+        opacity: 0.65,
+        dashArray: '4, 6',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(State.overpassLayerGroup);
+
+      // Tooltip
+      route.polyline.bindTooltip(route.name, { sticky: true });
+
+      // Click on map polyline -> highlight in list
+      route.polyline.on('click', () => {
+        selectOverpassRoute(index);
+      });
+
+      // Create List Item
+      const li = document.createElement('li');
+      li.className = 'overpass-route-item';
+      li.dataset.index = index;
+      li.innerHTML = `
+        <span class="overpass-route-name">${route.name}</span>
+        <span class="overpass-route-type" style="color: ${color};">${route.type}</span>
+      `;
+      
+      li.addEventListener('click', () => {
+        selectOverpassRoute(index, true);
+      });
+
+      DOM.overpassRouteListUl.appendChild(li);
+    });
+
+  } catch (err) {
+    DOM.overpassLoading.classList.add('hidden');
+    DOM.overpassRouteListUl.innerHTML = `<li style="text-align: center; color: #ef4444; font-size: 0.85rem; padding: 20px 0;">Fehler bei der Suche: ${err.message}</li>`;
+  }
+}
+
+let lastSelectedOverpassIndex = null;
+function selectOverpassRoute(index, zoomTo = false) {
+  const route = State.overpassRoutes[index];
+  if (!route) return;
+
+  // Reset last selected route styling
+  if (lastSelectedOverpassIndex !== null && State.overpassRoutes[lastSelectedOverpassIndex]) {
+    const prevRoute = State.overpassRoutes[lastSelectedOverpassIndex];
+    const prevColor = prevRoute.type === 'Fahrrad' ? '#3b82f6' : '#10b981';
+    prevRoute.polyline.setStyle({
+      weight: 4,
+      opacity: 0.65,
+      dashArray: '4, 6'
+    });
+  }
+
+  // Highlight new route
+  route.polyline.setStyle({
+    weight: 7,
+    opacity: 1.0,
+    dashArray: null
+  });
+  route.polyline.bringToFront();
+
+  // Highlight list item
+  const listItems = DOM.overpassRouteListUl.querySelectorAll('.overpass-route-item');
+  listItems.forEach(li => {
+    if (parseInt(li.dataset.index) === index) {
+      li.classList.add('active');
+      li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      li.classList.remove('active');
+    }
+  });
+
+  lastSelectedOverpassIndex = index;
+
+  if (zoomTo) {
+    MapController.map.fitBounds(route.polyline.getBounds());
+  }
+}
+
 
 /**
  * Calculates directions via ORS and updates UI & Map
@@ -2410,8 +2570,7 @@ function initMagicTrack() {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   });
-
-  // KI-Routen-Generierung
+    // KI-Routen-Generierung
   DOM.magicGenerateBtn.addEventListener('click', async () => {
     const startText = DOM.magicStartInput.value.trim();
     if (!startText) {
@@ -2446,14 +2605,28 @@ function initMagicTrack() {
         }
       }
 
-      // 2. Gemini-API aufrufen (Schritt 1)
+      // 2. POI-Vorabfrage (Overpass API)
+      DOM.magicLoadingDesc.textContent = 'Suche reale POIs im Umkreis...';
+      const lengthMax = parseInt(DOM.magicLengthMax.value) || 15;
+      const radius = Math.min(25000, Math.max(5000, (lengthMax * 1000) / 2));
+      const freeText = DOM.magicFreeText.value.trim();
+
+      const poiCandidates = await Overpass.getPOIsAround(
+        State.magicStartCoord.lat,
+        State.magicStartCoord.lon,
+        radius,
+        freeText
+      );
+
+      // 3. Gemini-API aufrufen (Schritt 1)
+      DOM.magicStep1.className = 'loading-step';
+      DOM.magicStep2.className = 'loading-step active';
       DOM.magicLoadingDesc.textContent = 'Rufe Gemini-API auf...';
+
       const lengthMin = parseInt(DOM.magicLengthMin.value);
-      const lengthMax = parseInt(DOM.magicLengthMax.value);
       const timeMin = parseInt(DOM.magicTimeMin.value);
       const timeMax = parseInt(DOM.magicTimeMax.value);
       const effort = DOM.magicEffortSelect.value;
-      const freeText = DOM.magicFreeText.value.trim();
       const currentProfile = State.activeProfile === 'foot-hiking' ? 'hiking' : 'trekking';
 
       let routeData = await Routing.generateMagicTrackRoute({
@@ -2463,73 +2636,40 @@ function initMagicTrack() {
         timeMax,
         effort,
         startLocation: State.magicStartCoord.name,
+        startLat: State.magicStartCoord.lat,
+        startLon: State.magicStartCoord.lon,
         profile: currentProfile,
-        freeText
+        freeText,
+        poiCandidates
       });
-
-      // 3. Wegpunkte geokodieren (Schritt 2)
-      DOM.magicStep1.className = 'loading-step';
-      DOM.magicStep2.className = 'loading-step active';
-      DOM.magicLoadingDesc.textContent = 'Berechne Zwischenstationen...';
-
-      const points = [];
-      // Startpunkt hinzufügen
-      points.push({
-        name: State.magicStartCoord.name,
-        lat: State.magicStartCoord.lat,
-        lon: State.magicStartCoord.lon
-      });
-
-      // Viewbox einschränken (ca. 40km Radius um den Startort)
-      const delta = 0.4;
-      const viewbox = `${State.magicStartCoord.lon - delta},${State.magicStartCoord.lat + delta},${State.magicStartCoord.lon + delta},${State.magicStartCoord.lat - delta}`;
-      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-      const waypointsToGeocode = routeData.semantic_waypoints || [];
-      
-      // Nur die Zwischenstationen geokodieren (Start und Ziel sind identisch)
-      for (let i = 0; i < waypointsToGeocode.length; i++) {
-        const wpName = waypointsToGeocode[i];
-        
-        // Überspringe, wenn Name dem Startort sehr ähnelt und es der erste/letzte ist
-        const isFirstOrLast = i === 0 || i === waypointsToGeocode.length - 1;
-        if (isFirstOrLast && (wpName.toLowerCase().includes('startort') || wpName.toLowerCase().includes(startText.split(',')[0].toLowerCase()))) {
-          continue;
-        }
-
-        DOM.magicLoadingDesc.textContent = `Geokodiere: ${wpName}...`;
-        const geocodeRes = await Routing.searchAddress(wpName, viewbox, true);
-        
-        if (geocodeRes && geocodeRes.length > 0) {
-          points.push({
-            name: geocodeRes[0].name,
-            lat: geocodeRes[0].lat,
-            lon: geocodeRes[0].lon
-          });
-        }
-
-        // OSM Policy Delay
-        if (i < waypointsToGeocode.length - 1) {
-          await sleep(800);
-        }
-      }
-
-      // Zielpunkt (wieder der Startpunkt für eine geschlossene Runde)
-      points.push({
-        name: State.magicStartCoord.name,
-        lat: State.magicStartCoord.lat,
-        lon: State.magicStartCoord.lon
-      });
-
-      // Validierung
-      if (points.length < 2) {
-        throw new Error('Es konnten keine Zwischenstationen geokodiert werden.');
-      }
 
       // 4. BRouter-Route berechnen (Schritt 3)
       DOM.magicStep2.className = 'loading-step';
       DOM.magicStep3.className = 'loading-step active';
       DOM.magicLoadingDesc.textContent = 'Berechne ideale Wegführung...';
+
+      const points = [];
+      const semanticWaypoints = routeData.semantic_waypoints || [];
+
+      semanticWaypoints.forEach(wp => {
+        if (wp.lat && wp.lon) {
+          points.push({
+            name: wp.name,
+            lat: parseFloat(wp.lat),
+            lon: parseFloat(wp.lon),
+            description: wp.description || ''
+          });
+        }
+      });
+
+      // Falls keine gültigen Punkte zurückgegeben wurden, Fallback
+      if (points.length < 2) {
+        points.push(State.magicStartCoord);
+        if (poiCandidates.length > 0) {
+          points.push(poiCandidates[0]);
+        }
+        points.push(State.magicStartCoord);
+      }
 
       const resolvedProfile = routeData.brouter_profile || (State.activeProfile === 'foot-hiking' ? 'hiking' : 'trekking');
       const finalRoute = await Routing.getRoute(
@@ -2560,14 +2700,15 @@ function initMagicTrack() {
         if (idx === points.length - 1 && idx > 0 && pt.lat === points[0].lat && pt.lon === points[0].lon) {
           return;
         }
-        
+
         const shortName = pt.name.split(',')[0];
         const item = document.createElement('div');
         item.style.display = 'flex';
         item.style.alignItems = 'center';
         item.style.gap = '8px';
-        item.style.padding = '4px 0';
-        
+        item.style.padding = '6px 0';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+
         const isStart = idx === 0;
         let badgeColor = 'var(--text-dimmed)';
         let label = `${idx + 1}`;
@@ -2577,8 +2718,11 @@ function initMagicTrack() {
         }
 
         item.innerHTML = `
-          <span class="badge" style="background-color: ${badgeColor}; color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block;">${label}</span>
-          <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${shortName}</span>
+          <span class="badge" style="background-color: ${badgeColor}; color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block; flex-shrink: 0;">${label}</span>
+          <div style="display: flex; flex-direction: column; min-width: 0; flex-grow: 1;">
+            <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${shortName}</span>
+            ${pt.description ? `<span style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${pt.description}</span>` : ''}
+          </div>
         `;
         DOM.magicResultWaypoints.appendChild(item);
       });
@@ -2589,10 +2733,13 @@ function initMagicTrack() {
         item.style.display = 'flex';
         item.style.alignItems = 'center';
         item.style.gap = '8px';
-        item.style.padding = '4px 0';
+        item.style.padding = '6px 0';
         item.innerHTML = `
-          <span class="badge" style="background-color: var(--color-primary); color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block;">Ziel</span>
-          <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${points[0].name.split(',')[0]}</span>
+          <span class="badge" style="background-color: var(--color-primary); color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block; flex-shrink: 0;">Ziel</span>
+          <div style="display: flex; flex-direction: column; min-width: 0; flex-grow: 1;">
+            <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${points[0].name.split(',')[0]}</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Zielort</span>
+          </div>
         `;
         DOM.magicResultWaypoints.appendChild(item);
       }

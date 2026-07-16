@@ -158,6 +158,28 @@
         <span id="ticker-elev-val" style="font-size: 0.72rem; color: var(--text-dimmed); display: block;">↑ 0m  ↓ 0m</span>
       </div>
 
+      <!-- Overpass Route Search Floating UI -->
+      <button id="search-map-routes-btn" title="Nach Wander- und Fahrradrouten im Kartenausschnitt suchen">
+        <i data-lucide="search" style="width: 15px; height: 15px;"></i>
+        <span>Bereich nach Routen durchsuchen</span>
+      </button>
+
+      <div id="overpass-routes-panel" class="hidden">
+        <div class="overpass-header">
+          <h3>Routen in der Nähe</h3>
+          <button id="close-overpass-btn" title="Schließen">
+            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+        <div class="overpass-content">
+          <div id="overpass-loading" class="overpass-loading-spinner hidden">
+            <div class="overpass-spinner"></div>
+            <span>Suche Routen...</span>
+          </div>
+          <ul id="overpass-route-list-ul" class="overpass-route-list"></ul>
+        </div>
+      </div>
+
       <!-- Floating Controls on Map -->
       <div class="map-controls">
         <button id="zoom-in-btn" class="map-btn" title="Vergrößern">

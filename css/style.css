@@ -1610,3 +1610,197 @@ input[type="checkbox"]:checked::after {
   backdrop-filter: blur(10px) saturate(180%);
   -webkit-backdrop-filter: blur(10px) saturate(180%);
 }
+
+/* Overpass Area Route Search */
+#search-map-routes-btn {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050;
+  background: rgba(18, 18, 20, 0.75);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid var(--color-border);
+  color: var(--text-main);
+  padding: 10px 18px;
+  border-radius: 30px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+#search-map-routes-btn:hover {
+  background-color: var(--color-primary);
+  color: #121214;
+  border-color: var(--color-primary);
+  transform: translateX(-50%) translateY(-2px);
+}
+
+#search-map-routes-btn:active {
+  transform: translateX(-50%) translateY(0);
+}
+
+#search-map-routes-btn.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(40, 40, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+#search-map-routes-btn.disabled:hover {
+  background: rgba(40, 40, 42, 0.6);
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(-50%) translateY(0);
+}
+
+#overpass-routes-panel {
+  position: absolute;
+  right: 16px;
+  top: 90px;
+  bottom: 16px;
+  width: 320px;
+  z-index: 1100;
+  border-radius: 16px;
+  background: rgba(18, 18, 20, 0.75);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  color: var(--text-main);
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+#overpass-routes-panel.hidden {
+  display: none !important;
+}
+
+.overpass-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.overpass-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+#close-overpass-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+#close-overpass-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.overpass-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.overpass-route-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overpass-route-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.overpass-route-item:hover {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.overpass-route-item.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--color-primary);
+}
+
+.overpass-route-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.overpass-route-type {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.overpass-loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.overpass-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  border-top-color: var(--color-primary);
+  animation: overpass-spin 0.8s linear infinite;
+}
+
+@keyframes overpass-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  #search-map-routes-btn {
+    top: 76px;
+  }
+  #overpass-routes-panel {
+    top: 76px;
+    right: 8px;
+    left: 8px;
+    bottom: 80px;
+    width: auto;
+  }
+}

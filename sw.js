@@ -1,4 +1,4 @@
-const CACHE_NAME = 'naviapp-shell-v3';
+const CACHE_NAME = 'naviapp-shell-v6';
 const TILE_CACHE_NAME = 'naviapp-tiles-v1';
 
 const ASSETS_TO_CACHE = [
@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
   './js/poi.js',
   './js/gpx.js',
   './js/storage.js',
+  './js/overpass.js',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   // Local resources
