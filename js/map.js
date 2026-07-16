@@ -418,5 +418,39 @@ export const MapController = {
       this.map.removeLayer(this.markers.longPress);
       this.markers.longPress = null;
     }
+  },
+
+  /**
+   * Rotates the entire map to a given bearing (degrees, 0 = north).
+   * Rotates the tile/overlay pane and counter-rotates markers so they stay upright.
+   * @param {number} bearing Device heading in degrees
+   */
+  setMapRotation(bearing) {
+    const angle = -bearing; // CSS rotates counter-clockwise, heading is CW from north
+
+    // Rotate the map container panes
+    const mapPane = this.map.getPane('mapPane');
+    if (mapPane) {
+      mapPane.style.transformOrigin = '50% 50%';
+      mapPane.style.transform = `rotate(${angle}deg)`;
+      mapPane.style.transition = 'transform 0.25s ease-out';
+    }
+
+    // Counter-rotate marker pane so icons stay upright
+    const markerPane = this.map.getPane('markerPane');
+    if (markerPane) {
+      markerPane.style.transformOrigin = '50% 50%';
+      markerPane.style.transform = `rotate(${-angle}deg)`;
+      markerPane.style.transition = 'transform 0.25s ease-out';
+    }
+
+    // Counter-rotate shadow pane too
+    const shadowPane = this.map.getPane('shadowPane');
+    if (shadowPane) {
+      shadowPane.style.transformOrigin = '50% 50%';
+      shadowPane.style.transform = `rotate(${-angle}deg)`;
+    }
+
+    this._currentBearing = bearing;
   }
 };

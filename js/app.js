@@ -32,7 +32,8 @@ const State = {
   longPressCoord: null,
   longPressTriggered: false,
   overpassLayerGroup: null,
-  overpassRoutes: [] // Array of loaded Overpass route objects
+  overpassRoutes: [], // Array of loaded Overpass route objects
+  compassMode: false  // true = map rotates with device compass
 };
 
 // DOM Elements
@@ -59,8 +60,7 @@ const DOM = {
   importGpxBtn: document.getElementById('import-gpx-btn'),
   gpxFileInput: document.getElementById('gpx-file-input'),
   gpsTrackBtn: document.getElementById('gps-track-btn'),
-  zoomInBtn: document.getElementById('zoom-in-btn'),
-  zoomOutBtn: document.getElementById('zoom-out-btn'),
+
   
   // Sidebar & Layout Toggles
   sidebar: document.getElementById('sidebar'),
@@ -74,19 +74,6 @@ const DOM = {
   closeModalBtn: document.getElementById('close-modal-btn'),
   saveSettingsBtn: document.getElementById('save-settings-btn'),
   routingEngineSelect: document.getElementById('routing-engine-select'),
-  brouterAllowSteps: document.getElementById('brouter-allow-steps'),
-  brouterAllowFerries: document.getElementById('brouter-allow-ferries'),
-  brouterIgnoreCycleroutes: document.getElementById('brouter-ignore-cycleroutes'),
-  brouterStickToCycleroutes: document.getElementById('brouter-stick-to-cycleroutes'),
-  brouterUseProposedCycleroutes: document.getElementById('brouter-use-proposed-cycleroutes'),
-  brouterAvoidUnsafe: document.getElementById('brouter-avoid-unsafe'),
-  brouterAddBeeline: document.getElementById('brouter-add-beeline'),
-  brouterConsiderNoise: document.getElementById('brouter-consider-noise'),
-  brouterConsiderRiver: document.getElementById('brouter-consider-river'),
-  brouterConsiderForest: document.getElementById('brouter-consider-forest'),
-  brouterConsiderTown: document.getElementById('brouter-consider-town'),
-  brouterConsiderTraffic: document.getElementById('brouter-consider-traffic'),
-  brouterConsiderElevation: document.getElementById('brouter-consider-elevation'),
   cacheSizeLabel: document.getElementById('cache-size-label'),
   clearCacheBtn: document.getElementById('clear-cache-btn'),
   
@@ -120,9 +107,7 @@ const DOM = {
   floatingSearchBar: document.getElementById('floating-search-bar'),
   hamburgerMenuBtn: document.getElementById('hamburger-menu-btn'),
   searchBarInput: document.getElementById('search-bar-input'),
-  quickOptionsBtn: document.getElementById('quick-options-btn'),
   searchBarResults: document.getElementById('search-bar-results'),
-  quickOptionsPanel: document.getElementById('quick-options-panel'),
   mapUndoBtn: document.getElementById('map-undo-btn'),
   offlineMapsBtn: document.getElementById('offline-maps-btn'),
 
@@ -172,6 +157,7 @@ const DOM = {
   settingsCyclerouteSelect: document.getElementById('settings-cycleroute-select'),
   settingsToggleProposedCycleways: document.getElementById('settings-toggle-proposed-cycleways'),
   settingsToggleTunnel: document.getElementById('settings-toggle-tunnel'),
+  settingsToggleBeeline: document.getElementById('settings-toggle-beeline'),
   settingsSliderUphill: document.getElementById('settings-slider-uphill'),
   settingsSliderDownhill: document.getElementById('settings-slider-downhill'),
 
@@ -341,6 +327,7 @@ function syncBRouterCheckboxes() {
   if (DOM.settingsToggleOneway) DOM.settingsToggleOneway.checked = !!getOpt('ignore_oneway', false);
   if (DOM.settingsToggleProposedCycleways) DOM.settingsToggleProposedCycleways.checked = !!getOpt('use_proposed_cycleroutes', false);
   if (DOM.settingsToggleTunnel) DOM.settingsToggleTunnel.checked = !!getOpt('avoid_tunnel', false);
+  if (DOM.settingsToggleBeeline) DOM.settingsToggleBeeline.checked = !!getOpt('add_beeline', false);
 
   // Sliders Level 3 Tuning
   const uphillVal = getOpt('uphillcost', 0);
@@ -350,13 +337,6 @@ function syncBRouterCheckboxes() {
   const downhillVal = getOpt('downhillcost', 0);
   if (DOM.settingsSliderDownhill) DOM.settingsSliderDownhill.value = downhillVal;
   if (document.getElementById('slider-val-downhill')) document.getElementById('slider-val-downhill').textContent = downhillVal;
-
-  // Sync to Map Quick Options Panel checkboxes (if they exist)
-  if (DOM.brouterAllowSteps) DOM.brouterAllowSteps.checked = !!getOpt('allow_steps', true);
-  if (DOM.brouterAllowFerries) DOM.brouterAllowFerries.checked = !!getOpt('allow_ferries', true);
-  if (DOM.brouterAvoidUnsafe) DOM.brouterAvoidUnsafe.checked = !!getOpt('avoid_unsafe', false);
-  if (DOM.brouterConsiderElevation) DOM.brouterConsiderElevation.checked = !!getOpt('avoid_steep', false);
-  if (DOM.brouterStickToCycleroutes) DOM.brouterStickToCycleroutes.checked = (cycleFocusVal === 'prefer');
 }
 
 function updateSliderLabel(type, val) {
@@ -494,18 +474,7 @@ function setupEventListeners() {
     DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
   }
 
-  // Quick Options Toggle
-  if (DOM.quickOptionsBtn) {
-    DOM.quickOptionsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      DOM.quickOptionsPanel.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-      if (DOM.quickOptionsPanel && !DOM.quickOptionsPanel.contains(e.target) && e.target !== DOM.quickOptionsBtn) {
-        DOM.quickOptionsPanel.classList.add('hidden');
-      }
-    });
-  }
+
 
   // Offline Karten Button in Sidebar
   if (DOM.offlineMapsBtn) {
@@ -526,29 +495,17 @@ function setupEventListeners() {
   if (DOM.saveSettingsBtn) {
     DOM.saveSettingsBtn.addEventListener('click', () => {
       const engine = DOM.routingEngineSelect.value;
-      
-      const brouterOpts = {
-        allow_steps: DOM.brouterAllowSteps.checked,
-        allow_ferries: DOM.brouterAllowFerries.checked,
-        ignore_cycleroutes: DOM.brouterIgnoreCycleroutes.checked,
-        stick_to_cycleroutes: DOM.brouterStickToCycleroutes.checked,
-        use_proposed_cycleroutes: DOM.brouterUseProposedCycleroutes.checked,
-        avoid_unsafe: DOM.brouterAvoidUnsafe.checked,
-        add_beeline: DOM.brouterAddBeeline.checked,
-        consider_noise: DOM.brouterConsiderNoise.checked,
-        consider_river: DOM.brouterConsiderRiver.checked,
-        consider_forest: DOM.brouterConsiderForest.checked,
-        consider_town: DOM.brouterConsiderTown.checked,
-        consider_traffic: DOM.brouterConsiderTraffic.checked,
-        consider_elevation: DOM.brouterConsiderElevation.checked
-      };
+      const offlineCheckbox = document.getElementById('offline-tiles-checkbox');
+      const offline = offlineCheckbox ? offlineCheckbox.checked : true;
       
       Storage.saveRoutingEngine(engine);
-      Storage.saveBRouterOptions(brouterOpts);
+      
+      // Update local storage and settings state
+      State.brouterOptions.offline_cache = offline;
+      Storage.saveBRouterOptions(State.brouterOptions);
       
       loadSettings();
       DOM.settingsModal.classList.add('hidden');
-      // If route already exists, recalculate it
       if (State.routePoints.length >= 2) {
         calculateAndDisplayRoute();
       }
@@ -751,7 +708,8 @@ function setupEventListeners() {
     { el: DOM.settingsToggleTraffic, key: 'consider_traffic' },
     { el: DOM.settingsToggleOneway, key: 'ignore_oneway' },
     { el: DOM.settingsToggleProposedCycleways, key: 'use_proposed_cycleroutes' },
-    { el: DOM.settingsToggleTunnel, key: 'avoid_tunnel' }
+    { el: DOM.settingsToggleTunnel, key: 'avoid_tunnel' },
+    { el: DOM.settingsToggleBeeline, key: 'add_beeline' }
   ];
 
   optionMappings.forEach(m => {
@@ -767,38 +725,6 @@ function setupEventListeners() {
       });
     }
   });
-
-  // Map Quick Options Panel checkboxes (bidirectional syncing)
-  const quickMappings = [
-    { el: DOM.brouterAllowSteps, key: 'allow_steps' },
-    { el: DOM.brouterAllowFerries, key: 'allow_ferries' },
-    { el: DOM.brouterAvoidUnsafe, key: 'avoid_unsafe' },
-    { el: DOM.brouterConsiderElevation, key: 'avoid_steep' }
-  ];
-
-  quickMappings.forEach(m => {
-    if (m.el) {
-      m.el.addEventListener('change', (e) => {
-        State.brouterOptions[m.key] = e.target.checked;
-        Storage.saveBRouterOptions(State.brouterOptions);
-        syncBRouterCheckboxes();
-        if (State.routePoints.length >= 2) {
-          calculateAndDisplayRoute(true);
-        }
-      });
-    }
-  });
-
-  if (DOM.brouterStickToCycleroutes) {
-    DOM.brouterStickToCycleroutes.addEventListener('change', (e) => {
-      State.brouterOptions.cycleroute_focus = e.target.checked ? 'prefer' : 'neutral';
-      Storage.saveBRouterOptions(State.brouterOptions);
-      syncBRouterCheckboxes();
-      if (State.routePoints.length >= 2) {
-        calculateAndDisplayRoute(true);
-      }
-    });
-  }
 
   // Sliders mapping
   const sliders = [
@@ -1210,8 +1136,7 @@ function setupEventListeners() {
   // Initial run to set correct state based on initial zoom
   setTimeout(updateSearchBtnState, 200);
 
-  DOM.zoomInBtn.addEventListener('click', () => MapController.map.zoomIn());
-  DOM.zoomOutBtn.addEventListener('click', () => MapController.map.zoomOut());
+
 
   // Bottom Sheet Mobile Drag Gestures
   setupBottomSheetGestures();
@@ -1664,6 +1589,9 @@ async function calculateAndDisplayRoute(isSettingsChange = false) {
 
     State.calculatedRoute = route;
     
+    // Register back gesture level 2: next back will clear the route
+    if (window._backGesture_pushRouteState) window._backGesture_pushRouteState();
+    
     // Draw on Map
     MapController.drawRoute(route.geojson, route.segments);
     
@@ -2026,28 +1954,76 @@ function renderSavedRoutes() {
   lucide.createIcons();
 }
 
+// GPS button states: 0 = idle (locate-fixed icon), 1 = located (compass icon, no rotation), 2 = compass active (compass icon, map rotates)
+State.gpsButtonState = 0;
+
 /**
- * Handle GPS tracking button toggles
+ * Helper – swap gpsTrackBtn icon to a given Lucide icon name
+ */
+function _setGpsBtnIcon(iconName, activeClass = false) {
+  DOM.gpsTrackBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+  lucide.createIcons({ nodes: [DOM.gpsTrackBtn] });
+  DOM.gpsTrackBtn.classList.toggle('active', activeClass);
+}
+
+/**
+ * Unified GPS / Compass toggle button handler.
+ * State 0 → 1: locate user, fly to position, icon → compass
+ * State 1 → 2: enable compass map rotation (active style)
+ * State 2 → 1: disable compass map rotation
  */
 function toggleGPSTracking() {
-  if (State.isTracking) {
-    Geolocation.stopTracking();
-    DOM.gpsTrackBtn.classList.remove('active');
-    State.isTracking = false;
-  } else {
-    Geolocation.startTracking();
-    DOM.gpsTrackBtn.classList.add('active');
+  const s = State.gpsButtonState;
+
+  if (s === 0) {
+    // ── State 0 → 1: locate & fly ──────────────────────────────
     State.isTracking = true;
-    
-    // Request permission/iOS orientations
+    State.gpsButtonState = 1;
+    Geolocation.startTracking();
     Geolocation.startHeadingTracking();
 
-    // Center on user position once loaded
+    const flyTo = (pos) => {
+      const lat = pos.coords ? pos.coords.latitude : pos.lat;
+      const lon = pos.coords ? pos.coords.longitude : pos.lng;
+      MapController.map.flyTo([lat, lon], 16, { animate: true, duration: 0.8 });
+      MapController.updateUserPosition(
+        pos.coords ? { lat, lng: lon, accuracy: pos.coords.accuracy || 20 } : pos,
+        false, State.activeProfile
+      );
+    };
+
     if (Geolocation.currentPosition) {
-      MapController.updateUserPosition(Geolocation.currentPosition, true, State.activeProfile);
+      flyTo(Geolocation.currentPosition);
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => flyTo(pos),
+        (err) => console.warn('GPS locate failed:', err),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     }
+    _setGpsBtnIcon('compass', false);
+    DOM.gpsTrackBtn.title = 'Kompass-Modus aktivieren';
+
+  } else if (s === 1) {
+    // ── State 1 → 2: compass on ────────────────────────────────
+    State.gpsButtonState = 2;
+    State.compassMode = true;
+    if (Geolocation.currentHeading !== null) {
+      MapController.setMapRotation(Geolocation.currentHeading);
+    }
+    _setGpsBtnIcon('compass', true);
+    DOM.gpsTrackBtn.title = 'Kompass-Modus deaktivieren';
+
+  } else {
+    // ── State 2 → 1: compass off ───────────────────────────────
+    State.gpsButtonState = 1;
+    State.compassMode = false;
+    MapController.setMapRotation(0);
+    _setGpsBtnIcon('compass', false);
+    DOM.gpsTrackBtn.title = 'Kompass-Modus aktivieren';
   }
 }
+
 
 /**
  * Geolocation callbacks
@@ -2065,6 +2041,10 @@ function setupGeolocation() {
 
   Geolocation.onHeadingUpdate((heading) => {
     MapController.updateUserHeading(heading);
+    // Rotate the map when compass mode is active
+    if (State.compassMode) {
+      MapController.setMapRotation(heading);
+    }
   });
 }
 
@@ -2214,55 +2194,161 @@ function stopNavigation() {
  */
 function setupBottomSheetGestures() {
   let startY = 0;
-  let startHeight = 0;
-  
-  DOM.bottomSheetHandle.addEventListener('touchstart', (e) => {
-    startY = e.touches[0].clientY;
-    DOM.bottomSheet.style.transition = 'none'; // temporary disable animation during drag
-  });
+  let startTranslateY = 0;
+  let H = 0;
+  let dragging = false;
 
-  DOM.bottomSheetHandle.addEventListener('touchmove', (e) => {
-    const currentY = e.touches[0].clientY;
-    const deltaY = startY - currentY; // positive = dragging up
-    
-    // We can just calculate basic thresholds or direct transform translations.
-    // For simplicity and fluid performance, we toggle classes on touch end rather than raw heights.
-  });
+  // ── History state management ──────────────────────────────────────
+  // Level 1: sheet is open  → state { sheetOpen: true }
+  // Level 2: route exists   → state { routeActive: true }
+  // Back gesture pops one level at a time.
 
-  DOM.bottomSheetHandle.addEventListener('touchend', (e) => {
-    DOM.bottomSheet.style.transition = ''; // restore animation
-    
-    const endY = e.changedTouches[0].clientY;
-    const deltaY = startY - endY;
+  let sheetStatePushed = false;
+  let routeStatePushed = false;
 
-    if (deltaY > 60) {
-      // Dragged up
-      if (!DOM.bottomSheet.classList.contains('half-open') && !DOM.bottomSheet.classList.contains('fully-open')) {
-        DOM.bottomSheet.classList.add('half-open');
-      } else if (DOM.bottomSheet.classList.contains('half-open')) {
-        DOM.bottomSheet.classList.remove('half-open');
-        DOM.bottomSheet.classList.add('fully-open');
-      }
-    } else if (deltaY < -60) {
-      // Dragged down
-      if (DOM.bottomSheet.classList.contains('fully-open')) {
-        DOM.bottomSheet.classList.remove('fully-open');
-        DOM.bottomSheet.classList.add('half-open');
-      } else if (DOM.bottomSheet.classList.contains('half-open')) {
-        DOM.bottomSheet.classList.remove('half-open');
+  /** Push a history entry to intercept the next back gesture for the sheet */
+  function pushSheetState() {
+    if (!sheetStatePushed) {
+      history.pushState({ sheetOpen: true }, '');
+      sheetStatePushed = true;
+    }
+  }
+
+  /** Push a history entry to intercept the next back gesture for the route */
+  function pushRouteState() {
+    if (!routeStatePushed) {
+      history.pushState({ routeActive: true }, '');
+      routeStatePushed = true;
+    }
+  }
+
+  // Called by external code when a route has been calculated
+  window._backGesture_pushRouteState = () => pushRouteState();
+
+  window.addEventListener('popstate', (e) => {
+    const state = e.state || {};
+
+    if (state.sheetOpen) {
+      // Level 1: close the sheet
+      DOM.bottomSheet.classList.remove('fully-open', 'half-open');
+      sheetStatePushed = false;
+    } else if (state.routeActive) {
+      // Level 2: clear the route
+      clearRoute();
+      routeStatePushed = false;
+    } else {
+      // Fallback: if sheet is open, close it; else clear route
+      if (DOM.bottomSheet.classList.contains('half-open') || DOM.bottomSheet.classList.contains('fully-open')) {
+        DOM.bottomSheet.classList.remove('fully-open', 'half-open');
+        sheetStatePushed = false;
+      } else if (State.routePoints.length > 0 || State.calculatedRoute) {
+        clearRoute();
+        routeStatePushed = false;
       }
     }
   });
 
-  // Cycle heights on click too
-  DOM.bottomSheetHandle.addEventListener('click', () => {
-    if (!DOM.bottomSheet.classList.contains('half-open') && !DOM.bottomSheet.classList.contains('fully-open')) {
+
+  function openBottomSheet(mode = 'half') {
+    if (mode === 'half') {
       DOM.bottomSheet.classList.add('half-open');
-    } else if (DOM.bottomSheet.classList.contains('half-open')) {
-      DOM.bottomSheet.classList.remove('half-open');
-      DOM.bottomSheet.classList.add('fully-open');
+      DOM.bottomSheet.classList.remove('fully-open');
     } else {
-      DOM.bottomSheet.classList.remove('fully-open', 'half-open');
+      DOM.bottomSheet.classList.add('fully-open');
+      DOM.bottomSheet.classList.remove('half-open');
+    }
+    pushSheetState();
+  }
+
+  function closeBottomSheet() {
+    DOM.bottomSheet.classList.remove('fully-open', 'half-open');
+    sheetStatePushed = false;
+  }
+
+  const dragTargets = [DOM.bottomSheetHandle, DOM.bottomSheet.querySelector('.sheet-summary')];
+  
+  dragTargets.forEach(target => {
+    if (!target) return;
+    
+    target.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+      H = DOM.bottomSheet.getBoundingClientRect().height;
+      
+      if (DOM.bottomSheet.classList.contains('fully-open')) {
+        startTranslateY = 0;
+      } else if (DOM.bottomSheet.classList.contains('half-open')) {
+        startTranslateY = H - 240;
+      } else {
+        startTranslateY = H - 76;
+      }
+      
+      DOM.bottomSheet.style.transition = 'none';
+      dragging = true;
+    });
+
+    target.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY; 
+      
+      let newTranslateY = startTranslateY + deltaY;
+      newTranslateY = Math.max(0, Math.min(H - 76, newTranslateY));
+      
+      DOM.bottomSheet.style.transform = `translateY(${newTranslateY}px)`;
+    });
+
+    target.addEventListener('touchend', (e) => {
+      if (!dragging) return;
+      dragging = false;
+      
+      DOM.bottomSheet.style.transition = '';
+      DOM.bottomSheet.style.transform = '';
+      
+      const endY = e.changedTouches[0].clientY;
+      const deltaY = endY - startY; 
+      const newTranslateY = Math.max(0, Math.min(H - 76, startTranslateY + deltaY));
+      
+      if (deltaY > 80) {
+        if (DOM.bottomSheet.classList.contains('fully-open')) {
+          openBottomSheet('half');
+        } else {
+          closeBottomSheet();
+        }
+        return;
+      }
+      
+      if (deltaY < -80) {
+        if (DOM.bottomSheet.classList.contains('half-open')) {
+          openBottomSheet('full');
+        } else {
+          openBottomSheet('half');
+        }
+        return;
+      }
+
+      const distClosed = Math.abs(newTranslateY - (H - 76));
+      const distHalf = Math.abs(newTranslateY - (H - 240));
+      const distFull = Math.abs(newTranslateY - 0);
+      
+      const minDist = Math.min(distClosed, distHalf, distFull);
+      if (minDist === distClosed) {
+        closeBottomSheet();
+      } else if (minDist === distHalf) {
+        openBottomSheet('half');
+      } else {
+        openBottomSheet('full');
+      }
+    });
+  });
+
+  DOM.bottomSheetHandle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!DOM.bottomSheet.classList.contains('half-open') && !DOM.bottomSheet.classList.contains('fully-open')) {
+      openBottomSheet('half');
+    } else if (DOM.bottomSheet.classList.contains('half-open')) {
+      openBottomSheet('full');
+    } else {
+      closeBottomSheet();
     }
   });
 }

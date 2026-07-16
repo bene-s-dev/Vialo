@@ -623,112 +623,18 @@ export const Routing = {
    * Communicates with Gemini API to generate route waypoints and details
    */
   async generateMagicTrackRoute(params) {
-    // 1. Try to call Vercel serverless function
-    try {
-      const response = await fetch('/api/generate-route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-      console.warn('Vercel serverless endpoint failed with status:', response.status);
-    } catch (e) {
-      console.warn('Vercel serverless function not available, trying client-side fallback...', e);
-    }
-
-    // 2. Client-side fallback (for local development or if not hosted on Vercel yet)
-    let localKey = localStorage.getItem('naviapp_gemini_api_key');
-    if (!localKey) {
-      localKey = prompt('Bitte gib deinen Gemini API-Key für die lokale Ausführung ein:');
-      if (!localKey) throw new Error('Gemini API-Key fehlt. Erstellung abgebrochen.');
-      localStorage.setItem('naviapp_gemini_api_key', localKey);
-    }
-
-    return await this.callGeminiClientSide(params, localKey);
-  },
-
-  /**
-   * Directly queries Gemini API from the client (fallback mode)
-   */
-  async callGeminiClientSide(params, apiKey) {
-    const { lengthMin, lengthMax, timeMin, timeMax, effort, startLocation, startLat, startLon, profile, freeText, poiCandidates } = params;
-    const sLat = parseFloat(startLat) || 51.1657;
-    const sLon = parseFloat(startLon) || 10.4515;
-
-    if (apiKey === 'mock-key') {
-      const city = startLocation.split(',')[0].trim();
-      return {
-        "chat_reply": `Ich habe eine wunderschöne ${effort.toLowerCase()}e Route rund um "${city}" zusammengestellt. Passend zu deinen Vorgaben (${lengthMin}-${lengthMax} km, ca. ${Math.round((timeMin+timeMax)/2)} Min) führt sie uns an schönen Aussichten und Naturwegen vorbei.`,
-        "brouter_profile": profile === 'hiking' ? 'hiking' : 'trekking',
-        "semantic_waypoints": [
-          { "name": startLocation, "lat": sLat, "lon": sLon, "description": "Startort" },
-          { "name": `Aussichtspunkt, ${city}`, "lat": sLat + 0.02, "lon": sLon + 0.02, "description": "Aussichtspunkt" },
-          { "name": `Wald & Natur, ${city}`, "lat": sLat - 0.02, "lon": sLon + 0.02, "description": "Schöner Waldweg" },
-          { "name": startLocation, "lat": sLat, "lon": sLon, "description": "Zielort" }
-        ]
-      };
-    }
-
-    const systemPrompt = `
-Du bist das Routing-Gehirn einer Navigations-App. Der Nutzer möchte eine Route planen.
-
-Eingestellte Parameter des Nutzers:
-- Gewünschte Länge: ${lengthMin || 5} bis ${lengthMax || 25} km
-- Gewünschte Dauer/Zeit: ${timeMin || 60} bis ${timeMax || 240} Minuten (Bereich: 30 Min bis 10 Std)
-- Gewünschte Anstrengung: ${effort || 'Mittel'} (Leicht / Mittel / Schwer)
-- Aktueller Startpunkt: "${startLocation || 'Unbekannter Startort'}" (${sLat}, ${sLon})
-- Aktuelles Profil: "${profile || 'Gravel'}"
-
-Zusätzlicher Freitext-Wunsch des Nutzers:
-"${freeText || ''}"
-
-Kandidaten-Liste realer POIs in der Nähe des Startorts:
-${JSON.stringify(poiCandidates || [])}
-
-Deine Aufgabe:
-1. Analysiere den Freitext und die Parameter. Bringe die gewünschte Länge (km) und die gewünschte Zeit in ein realistisches Verhältnis zur gewählten Aktivität.
-2. Wähle aus den bereitgestellten realen POIs (Kandidaten-Liste) die passendsten 2 bis 5 POIs aus, die am besten zu dem Wunsch des Nutzers passen.
-3. Sortiere sie in eine logische Reihenfolge für eine Rundtour, die am Startort beginnt und endet.
-4. Verwende für die Wegpunkte EXAKT die Namen und Koordinaten aus der bereitgestellten POI-Kandidaten-Liste oder dem Startort.
-5. Wähle das passende BRouter-Profil (z.B. "hiking" für schwere Wanderungen, "trekking" für leichte, "bicycle" für Radtouren).
-
-Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
-{
-  "chat_reply": "Eine kurze Erklärung auf Deutsch, warum du diese Route passend zu den Filtern und dem Wunsch gewählt hast.",
-  "brouter_profile": "hiking | bicycle | trekking",
-  "semantic_waypoints": [
-    { "name": "${startLocation}", "lat": ${sLat}, "lon": ${sLon}, "description": "Startpunkt" },
-    { "name": "Name des gewählten POIs 1", "lat": 51.1850, "lon": 10.4620, "description": "Erklärung..." },
-    { "name": "Name des gewählten POIs 2", "lat": 51.1920, "lon": 10.4710, "description": "Erklärung..." },
-    { "name": "${startLocation}", "lat": ${sLat}, "lon": ${sLon}, "description": "Zielpunkt" }
-  ]
-}
-`;
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
+    const response = await fetch('/api/generate-route', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      })
+      body: JSON.stringify(params)
     });
-
+    
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API returned ${response.status}: ${errText}`);
+      const errRes = await response.json().catch(() => ({}));
+      throw new Error(errRes.error || `Server antwortete mit Status ${response.status}`);
     }
-
-    const data = await response.json();
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) throw new Error('Empty response from Gemini API.');
-
-    return JSON.parse(resultText.trim());
+    
+    return await response.json();
   }
 };
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'naviapp-shell-v6';
+const CACHE_NAME = 'naviapp-shell-v11';
 const TILE_CACHE_NAME = 'naviapp-tiles-v1';
 
 const ASSETS_TO_CACHE = [

@@ -601,7 +601,40 @@ body, html {
   background-color: rgba(255,255,255,0.15) !important;
 }
 
-/* Floating Controls */
+/* GPS Locate Button – fixed bottom-right, above bottom sheet */
+.gps-locate-btn {
+  position: absolute;
+  bottom: 96px; /* sits above the collapsed bottom sheet peek (76px) + margin */
+  right: 16px;
+  z-index: 1050;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--color-border);
+  color: var(--text-main);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.gps-locate-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.gps-locate-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.08);
+  transition: transform 0.08s;
+}
+
+
 .map-controls {
   position: absolute;
   top: 16px;
@@ -1377,20 +1410,7 @@ input[type="checkbox"]:checked::after {
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* Quick Options Dropdown (BRouter settings) */
-#quick-options-panel {
-  position: absolute;
-  top: 76px;
-  left: 16px;
-  width: 380px;
-  max-height: 420px;
-  overflow-y: auto;
-  border-radius: 16px;
-  z-index: 1200;
-  padding: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  box-sizing: border-box;
-}
+
 
 /* Floating Undo Button for Clean Map Mode */
 #map-undo-btn {
@@ -1514,12 +1534,6 @@ input[type="checkbox"]:checked::after {
    ========================================================================== */
 @media (max-width: 900px) {
   #floating-search-bar {
-    left: 16px;
-    right: 16px;
-    width: auto;
-  }
-  
-  #quick-options-panel {
     left: 16px;
     right: 16px;
     width: auto;

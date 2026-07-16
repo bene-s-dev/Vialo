@@ -34,69 +34,7 @@
         <i data-lucide="menu"></i>
       </button>
       <input type="text" id="search-bar-input" placeholder="Wo soll es hingehen?" autocomplete="off">
-      <button id="quick-options-btn" title="Routen-Optionen">
-        <i data-lucide="sliders"></i>
-      </button>
       <div id="search-bar-results" class="search-results-box hidden"></div>
-    </div>
-
-    <!-- Quick Options Panel (BRouter options) -->
-    <div id="quick-options-panel" class="glass hidden">
-      <h4 style="margin: 0 0 10px 0; font-size: 0.82rem; text-transform: uppercase; color: var(--text-dimmed); letter-spacing: 0.5px; font-weight: 600;">Routen-Optionen</h4>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-allow-steps" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-allow-steps" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Treppen erlauben</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-allow-ferries" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-allow-ferries" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Fähren erlauben</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-avoid-unsafe" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-avoid-unsafe" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Hauptstraßen meiden</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-elevation" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-elevation" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Höhenmeter meiden</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-stick-to-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-stick-to-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Radrouten bevorzugen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-ignore-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-ignore-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Radrouten ignorieren</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-use-proposed-cycleroutes" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-use-proposed-cycleroutes" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Geplante Radwege nutzen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-noise" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-noise" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Ruhige Route (Lärm meiden)</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-river" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-river" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Wasserläufe bevorzugen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-forest" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-forest" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Wald & Parks bevorzugen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-town" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-town" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Städte umgehen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-consider-traffic" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-consider-traffic" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Verkehr berücksichtigen</label>
-        </div>
-        <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="brouter-add-beeline" style="width: auto; margin: 0; cursor: pointer;">
-          <label for="brouter-add-beeline" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none;">Luftlinie aktivieren</label>
-        </div>
-      </div>
     </div>
 
     <!-- Floating Undo Button for Clean Map Mode -->
@@ -180,17 +118,13 @@
         </div>
       </div>
 
+      <!-- GPS Locate Button (bottom right, above bottom sheet) -->
+      <button id="gps-track-btn" class="gps-locate-btn glass" title="Standort verfolgen">
+        <i data-lucide="locate-fixed"></i>
+      </button>
+
       <!-- Floating Controls on Map -->
       <div class="map-controls">
-        <button id="zoom-in-btn" class="map-btn" title="Vergrößern">
-          <i data-lucide="plus"></i>
-        </button>
-        <button id="zoom-out-btn" class="map-btn" title="Verkleinern">
-          <i data-lucide="minus"></i>
-        </button>
-        <button id="gps-track-btn" class="map-btn" title="Standort verfolgen">
-          <i data-lucide="navigation"></i>
-        </button>
         <button id="map-theme-btn" class="map-btn" title="Karten-Optionen">
           <i data-lucide="layers"></i>
         </button>
@@ -579,6 +513,10 @@
                   <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" id="settings-toggle-tunnel" style="width: auto; margin: 0; cursor: pointer;">
                     <label for="settings-toggle-tunnel" style="font-size: 0.85rem; cursor: pointer; user-select: none;">Tunnel komplett meiden</label>
+                  </div>
+                  <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="settings-toggle-beeline" style="width: auto; margin: 0; cursor: pointer;">
+                    <label for="settings-toggle-beeline" style="font-size: 0.85rem; cursor: pointer; user-select: none;">Luftlinie aktivieren (Beeline)</label>
                   </div>
                 </div>
 

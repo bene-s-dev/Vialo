@@ -1,3 +1,13 @@
+function parseSafeJSON(str) {
+  let cleaned = str.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '');
+  }
+  cleaned = cleaned.trim();
+  cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+  return JSON.parse(cleaned);
+}
+
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -5,7 +15,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Gemini-API-Key'
   );
 
   if (req.method === 'OPTIONS') {
@@ -16,9 +26,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY environment variable is not set on Vercel.' });
+    return res.status(400).json({ error: 'API-Key fehlt. Bitte trage deinen Gemini API-Key in der App ein.' });
   }
 
   const { lengthMin, lengthMax, timeMin, timeMax, effort, startLocation, startLat, startLon, profile, freeText, poiCandidates } = req.body;
@@ -85,7 +95,7 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
       return res.status(500).json({ error: 'Empty response from Gemini API.' });
     }
 
-    const routeData = JSON.parse(resultText.trim());
+    const routeData = parseSafeJSON(resultText);
     return res.status(200).json(routeData);
   } catch (error) {
     console.error('Error generating route in serverless function:', error);
