@@ -1,4 +1,4 @@
-const CACHE_NAME = 'naviapp-shell-v1';
+const CACHE_NAME = 'naviapp-shell-v3';
 const TILE_CACHE_NAME = 'naviapp-tiles-v1';
 
 const ASSETS_TO_CACHE = [
@@ -15,10 +15,10 @@ const ASSETS_TO_CACHE = [
   './js/storage.js',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
-  // CDN resources
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://unpkg.com/lucide@0.300.0/dist/umd/lucide.min.js',
+  // Local resources
+  './js/leaflet.js',
+  './css/leaflet.css',
+  './js/lucide.min.js',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
   'https://fonts.gstatic.com/s/outfit/v11/QId5dD19y-q_866LoNPy2q_O.woff2'
 ];

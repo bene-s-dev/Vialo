@@ -72,7 +72,8 @@ export const MapController = {
     user: null,
     accuracy: null,
     pois: [],
-    waypoints: []
+    waypoints: [],
+    longPress: null
   },
   routePolyline: null,
   routeHighlightPolyline: null,
@@ -102,7 +103,7 @@ export const MapController = {
       attribution: '&copy; OpenTopoMap'
     });
 
-    this.layers.cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openapi.mapotempo.fr/cyclosm/{z}/{x}/{y}.png', {
+    this.layers.cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; CyclOSM &amp; OpenStreetMap'
     });
@@ -246,14 +247,14 @@ export const MapController = {
       // Draw colored segments
       const polylines = [];
       let currentCoords = [];
-      let currentSurface = segments[0].surface || 'unbekannt';
+      let currentSurface = segments[0].effective_surface || segments[0].surface || 'unbekannt';
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         currentCoords.push([seg.lat, seg.lon]);
 
         const isLast = i === segments.length - 1;
-        const nextSurface = !isLast ? (segments[i + 1].surface || 'unbekannt') : '';
+        const nextSurface = !isLast ? (segments[i + 1].effective_surface || segments[i + 1].surface || 'unbekannt') : '';
         const surfaceChanged = !isLast && nextSurface !== currentSurface;
 
         if (surfaceChanged || isLast) {
@@ -386,5 +387,36 @@ export const MapController = {
   clearPOIs() {
     this.markers.pois.forEach(m => this.map.removeLayer(m));
     this.markers.pois = [];
+  },
+
+  /**
+   * Sets the temporary long press pin on the map
+   */
+  setLongPressMarker(latlng) {
+    if (this.markers.longPress) {
+      this.markers.longPress.setLatLng(latlng);
+    } else {
+      const pinIcon = L.divIcon({
+        html: `
+          <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2C10.5 2 6 6.5 6 12C6 19.5 16 30 16 30C16 30 26 19.5 26 12C26 6.5 21.5 2 16 2Z" fill="#ef4444" stroke="#FFFFFF" stroke-width="1.5" />
+            <circle cx="16" cy="12" r="4" fill="#FFFFFF" />
+          </svg>`,
+        className: 'custom-div-icon',
+        iconSize: [32, 32],
+        iconAnchor: [16, 30]
+      });
+      this.markers.longPress = L.marker(latlng, { icon: pinIcon }).addTo(this.map);
+    }
+  },
+
+  /**
+   * Removes the temporary long press pin
+   */
+  clearLongPressMarker() {
+    if (this.markers.longPress) {
+      this.map.removeLayer(this.markers.longPress);
+      this.markers.longPress = null;
+    }
   }
 };

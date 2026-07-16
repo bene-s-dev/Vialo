@@ -14,6 +14,7 @@ import { POI } from './poi.js';
 const State = {
   profileMapping: {
     'cycling-regular': 'trekking',
+    'cycling-road': 'cycling-road',
     'foot-hiking': 'hiking'
   },
   routePoints: [], // Array of { name, lat, lon }
@@ -25,7 +26,10 @@ const State = {
   isPickOnMapActive: false,
   routingEngine: 'brouter',
   apiKey: null,
-  brouterOptions: {}
+  brouterOptions: {},
+  magicStartCoord: null,
+  longPressCoord: null,
+  longPressTriggered: false
 };
 
 // DOM Elements
@@ -93,7 +97,6 @@ const DOM = {
   surfaceList: document.getElementById('surface-list'),
   savedRoutesList: document.getElementById('saved-routes-list'),
   routePointsList: document.getElementById('route-points-list'),
-  
   // Map overlays
   mapThemeBtn: document.getElementById('map-theme-btn'),
   mapThemeMenu: document.getElementById('map-theme-menu'),
@@ -103,13 +106,107 @@ const DOM = {
   navText: document.getElementById('nav-instruction-text'),
   stopNavBtn: document.getElementById('stop-nav-btn'),
   
-  // Mobile Bottom Sheet
+  // Mobile Bottom Sheet & Panels
   bottomSheet: document.getElementById('bottom-sheet'),
   bottomSheetHandle: document.querySelector('.bottom-sheet-handle'),
   sheetSummaryDist: document.getElementById('sheet-summary-dist'),
   sheetSummaryDur: document.getElementById('sheet-summary-dur'),
   sheetActionBtn: document.getElementById('sheet-action-btn'),
-  mobileRouteDetails: document.getElementById('mobile-route-details')
+  
+  // Floating Search Bar & Undo Button
+  floatingSearchBar: document.getElementById('floating-search-bar'),
+  hamburgerMenuBtn: document.getElementById('hamburger-menu-btn'),
+  searchBarInput: document.getElementById('search-bar-input'),
+  quickOptionsBtn: document.getElementById('quick-options-btn'),
+  searchBarResults: document.getElementById('search-bar-results'),
+  quickOptionsPanel: document.getElementById('quick-options-panel'),
+  mapUndoBtn: document.getElementById('map-undo-btn'),
+  offlineMapsBtn: document.getElementById('offline-maps-btn'),
+
+  // Bottom Sheet Containers
+  sheetPlanningContainer: document.getElementById('sheet-planning-container'),
+  sheetResultsContainer: document.getElementById('sheet-results-container'),
+  tabBtnRoute: document.getElementById('tab-btn-route'),
+  tabBtnSettings: document.getElementById('tab-btn-settings'),
+  tabContentRoute: document.getElementById('tab-content-route'),
+  tabContentSettings: document.getElementById('tab-content-settings'),
+  resultsBackBtn: document.getElementById('results-back-btn'),
+  navigationInstructions: document.getElementById('navigation-instructions'),
+
+  // Long Press Actions
+  longPressActions: document.getElementById('long-press-actions'),
+  longPressAddress: document.getElementById('long-press-address'),
+  longPressStartBtn: document.getElementById('long-press-start-btn'),
+  longPressWpBtn: document.getElementById('long-press-wp-btn'),
+  longPressCancelBtn: document.getElementById('long-press-cancel-btn'),
+
+  // Activities selector
+  activityBikeBtn: document.getElementById('activity-bike-btn'),
+  activityFootBtn: document.getElementById('activity-foot-btn'),
+
+  // Level 1 Settings
+  settingsProfileSelect: document.getElementById('settings-profile-select'),
+  settingsAsphaltSelect: document.getElementById('settings-asphalt-select'),
+  settingsAvoidUnsafe: document.getElementById('settings-avoid-unsafe'),
+  settingsAvoidSteep: document.getElementById('settings-avoid-steep'),
+  settingsOfflineCache: document.getElementById('settings-offline-cache'),
+
+  // Level 2 Settings Sliders & Toggles
+  settingsSliderUnpaved: document.getElementById('settings-slider-unpaved'),
+  settingsSliderPath: document.getElementById('settings-slider-path'),
+  settingsToggleNoise: document.getElementById('settings-toggle-noise'),
+  settingsToggleRiver: document.getElementById('settings-toggle-river'),
+  settingsToggleForest: document.getElementById('settings-toggle-forest'),
+  settingsToggleTown: document.getElementById('settings-toggle-town'),
+  settingsToggleFerries: document.getElementById('settings-toggle-ferries'),
+  settingsToggleSteps: document.getElementById('settings-toggle-steps'),
+  settingsToggleTraffic: document.getElementById('settings-toggle-traffic'),
+
+  // Level 3 Settings
+  settingsSliderCobblestone: document.getElementById('settings-slider-cobblestone'),
+  settingsSliderSandmud: document.getElementById('settings-slider-sandmud'),
+  settingsToggleOneway: document.getElementById('settings-toggle-oneway'),
+  settingsCyclerouteSelect: document.getElementById('settings-cycleroute-select'),
+  settingsToggleProposedCycleways: document.getElementById('settings-toggle-proposed-cycleways'),
+  settingsToggleTunnel: document.getElementById('settings-toggle-tunnel'),
+  settingsSliderUphill: document.getElementById('settings-slider-uphill'),
+  settingsSliderDownhill: document.getElementById('settings-slider-downhill'),
+
+  // Map Stats Ticker
+  mapStatsTicker: document.getElementById('map-stats-ticker'),
+  tickerDistVal: document.getElementById('ticker-dist-val'),
+  tickerElevVal: document.getElementById('ticker-elev-val'),
+
+  // MagicTrack AI Modal
+  magicTrackBtn: document.getElementById('magic-track-btn'),
+  magicTrackModal: document.getElementById('magic-track-modal'),
+  closeMagicModalBtn: document.getElementById('close-magic-modal-btn'),
+  magicStartInput: document.getElementById('magic-start-input'),
+  magicGpsBtn: document.getElementById('magic-gps-btn'),
+  magicGpsStatus: document.getElementById('magic-gps-status'),
+  magicFreeText: document.getElementById('magic-free-text'),
+  magicLengthMin: document.getElementById('magic-length-min'),
+  magicLengthMax: document.getElementById('magic-length-max'),
+  magicLengthTrack: document.getElementById('magic-length-track'),
+  magicLengthVal: document.getElementById('magic-length-val'),
+  magicTimeMin: document.getElementById('magic-time-min'),
+  magicTimeMax: document.getElementById('magic-time-max'),
+  magicTimeTrack: document.getElementById('magic-time-track'),
+  magicTimeVal: document.getElementById('magic-time-val'),
+  magicEffortSelect: document.getElementById('magic-effort-select'),
+  magicGenerateBtn: document.getElementById('magic-generate-btn'),
+  magicInputState: document.getElementById('magic-input-state'),
+  magicLoadingState: document.getElementById('magic-loading-state'),
+  magicResultState: document.getElementById('magic-result-state'),
+  magicLoadingTitle: document.getElementById('magic-loading-title'),
+  magicLoadingDesc: document.getElementById('magic-loading-desc'),
+  magicStep1: document.getElementById('magic-step-1'),
+  magicStep2: document.getElementById('magic-step-2'),
+  magicStep3: document.getElementById('magic-step-3'),
+  magicResultReply: document.getElementById('magic-result-reply'),
+  magicResultWaypoints: document.getElementById('magic-result-waypoints'),
+  magicResultApplyBtn: document.getElementById('magic-result-apply-btn'),
+  magicResultEditBtn: document.getElementById('magic-result-edit-btn')
 };
 
 // Init application
@@ -128,6 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Setup Event Listeners
   setupEventListeners();
+  
+  // Setup MagicTrack Modal
+  initMagicTrack();
   
   // Setup Geolocation callbacks
   setupGeolocation();
@@ -155,6 +255,158 @@ function updateOnlineStatus() {
   });
 }
 
+function syncBRouterCheckboxes() {
+  const opts = State.brouterOptions;
+
+  // Let's set defaults for any missing options
+  const getOpt = (key, def) => opts[key] !== undefined ? opts[key] : def;
+
+  // Level 1
+  if (DOM.settingsProfileSelect) DOM.settingsProfileSelect.value = getOpt('profile', State.activeProfile);
+  
+  // Asphalt select active state
+  const asphaltVal = getOpt('asphalt_preference', 'any');
+  if (DOM.settingsAsphaltSelect) {
+    DOM.settingsAsphaltSelect.querySelectorAll('.segment-btn').forEach(btn => {
+      if (btn.dataset.value === asphaltVal) {
+        btn.classList.add('active');
+        btn.style.backgroundColor = 'var(--color-primary)';
+        btn.style.color = '#121214';
+      } else {
+        btn.classList.remove('active');
+        btn.style.backgroundColor = 'transparent';
+        btn.style.color = 'var(--text-muted)';
+      }
+    });
+  }
+
+  // Toggles Level 1
+  if (DOM.settingsAvoidUnsafe) DOM.settingsAvoidUnsafe.checked = !!getOpt('avoid_unsafe', false);
+  if (DOM.settingsAvoidSteep) DOM.settingsAvoidSteep.checked = !!getOpt('avoid_steep', false);
+  if (DOM.settingsOfflineCache) DOM.settingsOfflineCache.checked = !!getOpt('offline_cache', true);
+
+  // Sliders Level 2
+  const unpavedVal = getOpt('unpaved_preference', 5);
+  if (DOM.settingsSliderUnpaved) DOM.settingsSliderUnpaved.value = unpavedVal;
+  updateSliderLabel('unpaved', unpavedVal);
+
+  const pathVal = getOpt('path_preference', 5);
+  if (DOM.settingsSliderPath) DOM.settingsSliderPath.value = pathVal;
+  updateSliderLabel('path', pathVal);
+
+  // Toggles Level 2
+  if (DOM.settingsToggleNoise) DOM.settingsToggleNoise.checked = !!getOpt('consider_noise', false);
+  if (DOM.settingsToggleRiver) DOM.settingsToggleRiver.checked = !!getOpt('consider_river', false);
+  if (DOM.settingsToggleForest) DOM.settingsToggleForest.checked = !!getOpt('consider_forest', false);
+  if (DOM.settingsToggleTown) DOM.settingsToggleTown.checked = !!getOpt('consider_town', false);
+  if (DOM.settingsToggleFerries) DOM.settingsToggleFerries.checked = !!getOpt('allow_ferries', true);
+  if (DOM.settingsToggleSteps) DOM.settingsToggleSteps.checked = !!getOpt('allow_steps', true);
+  if (DOM.settingsToggleTraffic) DOM.settingsToggleTraffic.checked = !!getOpt('consider_traffic', false);
+
+  // Sliders Level 3
+  const cobbleVal = getOpt('cobblestone_preference', 1);
+  if (DOM.settingsSliderCobblestone) DOM.settingsSliderCobblestone.value = cobbleVal;
+  updateSliderLabel('cobblestone', cobbleVal);
+
+  const sandmudVal = getOpt('sandmud_preference', 1);
+  if (DOM.settingsSliderSandmud) DOM.settingsSliderSandmud.value = sandmudVal;
+  updateSliderLabel('sandmud', sandmudVal);
+
+  // Cycleroute focus selector active state
+  const cycleFocusVal = getOpt('cycleroute_focus', 'neutral');
+  if (DOM.settingsCyclerouteSelect) {
+    DOM.settingsCyclerouteSelect.querySelectorAll('.segment-btn').forEach(btn => {
+      if (btn.dataset.value === cycleFocusVal) {
+        btn.classList.add('active');
+        btn.style.backgroundColor = 'var(--color-primary)';
+        btn.style.color = '#121214';
+      } else {
+        btn.classList.remove('active');
+        btn.style.backgroundColor = 'transparent';
+        btn.style.color = 'var(--text-muted)';
+      }
+    });
+  }
+
+  // Toggles Level 3
+  if (DOM.settingsToggleOneway) DOM.settingsToggleOneway.checked = !!getOpt('ignore_oneway', false);
+  if (DOM.settingsToggleProposedCycleways) DOM.settingsToggleProposedCycleways.checked = !!getOpt('use_proposed_cycleroutes', false);
+  if (DOM.settingsToggleTunnel) DOM.settingsToggleTunnel.checked = !!getOpt('avoid_tunnel', false);
+
+  // Sliders Level 3 Tuning
+  const uphillVal = getOpt('uphillcost', 0);
+  if (DOM.settingsSliderUphill) DOM.settingsSliderUphill.value = uphillVal;
+  if (document.getElementById('slider-val-uphill')) document.getElementById('slider-val-uphill').textContent = uphillVal;
+
+  const downhillVal = getOpt('downhillcost', 0);
+  if (DOM.settingsSliderDownhill) DOM.settingsSliderDownhill.value = downhillVal;
+  if (document.getElementById('slider-val-downhill')) document.getElementById('slider-val-downhill').textContent = downhillVal;
+
+  // Sync to Map Quick Options Panel checkboxes (if they exist)
+  if (DOM.brouterAllowSteps) DOM.brouterAllowSteps.checked = !!getOpt('allow_steps', true);
+  if (DOM.brouterAllowFerries) DOM.brouterAllowFerries.checked = !!getOpt('allow_ferries', true);
+  if (DOM.brouterAvoidUnsafe) DOM.brouterAvoidUnsafe.checked = !!getOpt('avoid_unsafe', false);
+  if (DOM.brouterConsiderElevation) DOM.brouterConsiderElevation.checked = !!getOpt('avoid_steep', false);
+  if (DOM.brouterStickToCycleroutes) DOM.brouterStickToCycleroutes.checked = (cycleFocusVal === 'prefer');
+}
+
+function updateSliderLabel(type, val) {
+  const el = document.getElementById(`slider-val-${type}`);
+  if (!el) return;
+  if (type === 'unpaved' || type === 'path') {
+    if (val < 5) el.textContent = 'Bevorzugen';
+    else if (val == 5) el.textContent = 'Egal';
+    else el.textContent = 'Meiden';
+  } else if (type === 'cobblestone' || type === 'sandmud') {
+    if (val == 1) el.textContent = 'Egal';
+    else if (val < 5) el.textContent = 'Leicht meiden';
+    else if (val < 9) el.textContent = 'Meiden';
+    else el.textContent = 'Stark meiden';
+  }
+}
+
+function updateActivityUI(profile) {
+  const isHiking = profile === 'foot-hiking' || profile === 'hiking';
+  
+  // Update active button state
+  if (isHiking) {
+    if (DOM.activityBikeBtn) DOM.activityBikeBtn.classList.remove('active');
+    if (DOM.activityBikeBtn) DOM.activityBikeBtn.style.color = 'var(--text-muted)';
+    if (DOM.activityFootBtn) DOM.activityFootBtn.classList.add('active');
+    if (DOM.activityFootBtn) DOM.activityFootBtn.style.color = '#121214';
+  } else {
+    if (DOM.activityBikeBtn) DOM.activityBikeBtn.classList.add('active');
+    if (DOM.activityBikeBtn) DOM.activityBikeBtn.style.color = '#121214';
+    if (DOM.activityFootBtn) DOM.activityFootBtn.classList.remove('active');
+    if (DOM.activityFootBtn) DOM.activityFootBtn.style.color = 'var(--text-muted)';
+  }
+
+  // Hide cycling-only elements
+  const bikeElements = document.querySelectorAll('.class-cycle-only');
+  bikeElements.forEach(el => {
+    if (isHiking) {
+      el.style.setProperty('display', 'none', 'important');
+    } else {
+      el.style.removeProperty('display');
+    }
+  });
+
+  // Hide "Nur Asphalt" option for Wandern (Hiking)
+  const onlyAsphaltBtn = document.querySelector('#settings-asphalt-select [data-value="only_asphalt"]');
+  if (onlyAsphaltBtn) {
+    if (isHiking) {
+      onlyAsphaltBtn.style.display = 'none';
+      // Reset if it was active
+      if (State.brouterOptions.asphalt_preference === 'only_asphalt') {
+        State.brouterOptions.asphalt_preference = 'any';
+        Storage.saveBRouterOptions(State.brouterOptions);
+      }
+    } else {
+      onlyAsphaltBtn.style.display = '';
+    }
+  }
+}
+
 function loadSettings() {
   State.routingEngine = Storage.getRoutingEngine();
   State.apiKey = Storage.getApiKey();
@@ -162,22 +414,6 @@ function loadSettings() {
 
   if (DOM.routingEngineSelect) {
     DOM.routingEngineSelect.value = State.routingEngine;
-  }
-
-  if (DOM.brouterAllowSteps) {
-    DOM.brouterAllowSteps.checked = State.brouterOptions.allow_steps !== false;
-    DOM.brouterAllowFerries.checked = State.brouterOptions.allow_ferries !== false;
-    DOM.brouterIgnoreCycleroutes.checked = !!State.brouterOptions.ignore_cycleroutes;
-    DOM.brouterStickToCycleroutes.checked = !!State.brouterOptions.stick_to_cycleroutes;
-    DOM.brouterUseProposedCycleroutes.checked = !!State.brouterOptions.use_proposed_cycleroutes;
-    DOM.brouterAvoidUnsafe.checked = !!State.brouterOptions.avoid_unsafe;
-    DOM.brouterAddBeeline.checked = !!State.brouterOptions.add_beeline;
-    DOM.brouterConsiderNoise.checked = !!State.brouterOptions.consider_noise;
-    DOM.brouterConsiderRiver.checked = !!State.brouterOptions.consider_river;
-    DOM.brouterConsiderForest.checked = !!State.brouterOptions.consider_forest;
-    DOM.brouterConsiderTown.checked = !!State.brouterOptions.consider_town;
-    DOM.brouterConsiderTraffic.checked = !!State.brouterOptions.consider_traffic;
-    DOM.brouterConsiderElevation.checked = State.brouterOptions.consider_elevation !== false;
   }
 
   // Set active profile from localstorage if saved previously
@@ -194,49 +430,396 @@ function loadSettings() {
       }
     });
   }
+
+  updateActivityUI(State.activeProfile);
+  syncBRouterCheckboxes();
+
+  // Restore active map layer preference
+  const savedLayer = localStorage.getItem('active_map_layer');
+  if (savedLayer) {
+    // Delay execution slightly so MapController.init has finished
+    setTimeout(() => {
+      MapController.switchLayer(savedLayer);
+      // Sync active button class in layer selector menu
+      const layerOptions = document.querySelectorAll('.layer-option');
+      layerOptions.forEach(opt => {
+        if (opt.dataset.layer === savedLayer) opt.classList.add('active');
+        else opt.classList.remove('active');
+      });
+    }, 200);
+  }
+
+  // Restore planned route
+  try {
+    const savedRoute = localStorage.getItem('planned_route');
+    if (savedRoute) {
+      const parsed = JSON.parse(savedRoute);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        State.routePoints = parsed;
+        
+        // Truncate search bar on startup if points exist (Clean Map Mode)
+        if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.add('search-hidden');
+        if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.remove('hidden');
+
+        // Delay execution slightly so map is ready
+        setTimeout(() => {
+          updateSearchInputsFromPoints();
+          renderRoutePoints();
+          if (State.routePoints.length >= 2) {
+            calculateAndDisplayRoute();
+          }
+        }, 500);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to restore planned route from localStorage:', err);
+  }
 }
 
 function setupEventListeners() {
-  // Sidebar Toggles (Mobile drawer)
-  DOM.toggleSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
-  DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
+  // Sidebar Toggles
+  if (DOM.hamburgerMenuBtn) {
+    DOM.hamburgerMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
+  }
+  if (DOM.closeSidebarBtn) {
+    DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
+  }
+
+  // Quick Options Toggle
+  if (DOM.quickOptionsBtn) {
+    DOM.quickOptionsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      DOM.quickOptionsPanel.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+      if (DOM.quickOptionsPanel && !DOM.quickOptionsPanel.contains(e.target) && e.target !== DOM.quickOptionsBtn) {
+        DOM.quickOptionsPanel.classList.add('hidden');
+      }
+    });
+  }
+
+  // Offline Karten Button in Sidebar
+  if (DOM.offlineMapsBtn) {
+    DOM.offlineMapsBtn.addEventListener('click', () => {
+      alert('Offline-Karten aktiv: Der Cache speichert alle angezeigten Kartenabschnitte automatisch im Hintergrund.');
+      DOM.sidebar.classList.remove('open');
+    });
+  }
 
   // Settings Modal
   const openSettings = async () => {
     DOM.settingsModal.classList.remove('hidden');
     await updateCacheSizeDisplay();
   };
-  DOM.settingsBtnDesktop.addEventListener('click', openSettings);
-  DOM.settingsBtnMobile.addEventListener('click', openSettings);
+  if (DOM.settingsBtnDesktop) DOM.settingsBtnDesktop.addEventListener('click', openSettings);
   
-  DOM.closeModalBtn.addEventListener('click', () => DOM.settingsModal.classList.add('hidden'));
-  DOM.saveSettingsBtn.addEventListener('click', () => {
-    const engine = DOM.routingEngineSelect.value;
-    
-    const brouterOpts = {
-      allow_steps: DOM.brouterAllowSteps.checked,
-      allow_ferries: DOM.brouterAllowFerries.checked,
-      ignore_cycleroutes: DOM.brouterIgnoreCycleroutes.checked,
-      stick_to_cycleroutes: DOM.brouterStickToCycleroutes.checked,
-      use_proposed_cycleroutes: DOM.brouterUseProposedCycleroutes.checked,
-      avoid_unsafe: DOM.brouterAvoidUnsafe.checked,
-      add_beeline: DOM.brouterAddBeeline.checked,
-      consider_noise: DOM.brouterConsiderNoise.checked,
-      consider_river: DOM.brouterConsiderRiver.checked,
-      consider_forest: DOM.brouterConsiderForest.checked,
-      consider_town: DOM.brouterConsiderTown.checked,
-      consider_traffic: DOM.brouterConsiderTraffic.checked,
-      consider_elevation: DOM.brouterConsiderElevation.checked
-    };
-    
-    Storage.saveRoutingEngine(engine);
-    Storage.saveBRouterOptions(brouterOpts);
-    
-    loadSettings();
-    DOM.settingsModal.classList.add('hidden');
-    // If route already exists, recalculate it
-    if (State.routePoints.length >= 2) {
-      calculateAndDisplayRoute();
+  if (DOM.closeModalBtn) DOM.closeModalBtn.addEventListener('click', () => DOM.settingsModal.classList.add('hidden'));
+  if (DOM.saveSettingsBtn) {
+    DOM.saveSettingsBtn.addEventListener('click', () => {
+      const engine = DOM.routingEngineSelect.value;
+      
+      const brouterOpts = {
+        allow_steps: DOM.brouterAllowSteps.checked,
+        allow_ferries: DOM.brouterAllowFerries.checked,
+        ignore_cycleroutes: DOM.brouterIgnoreCycleroutes.checked,
+        stick_to_cycleroutes: DOM.brouterStickToCycleroutes.checked,
+        use_proposed_cycleroutes: DOM.brouterUseProposedCycleroutes.checked,
+        avoid_unsafe: DOM.brouterAvoidUnsafe.checked,
+        add_beeline: DOM.brouterAddBeeline.checked,
+        consider_noise: DOM.brouterConsiderNoise.checked,
+        consider_river: DOM.brouterConsiderRiver.checked,
+        consider_forest: DOM.brouterConsiderForest.checked,
+        consider_town: DOM.brouterConsiderTown.checked,
+        consider_traffic: DOM.brouterConsiderTraffic.checked,
+        consider_elevation: DOM.brouterConsiderElevation.checked
+      };
+      
+      Storage.saveRoutingEngine(engine);
+      Storage.saveBRouterOptions(brouterOpts);
+      
+      loadSettings();
+      DOM.settingsModal.classList.add('hidden');
+      // If route already exists, recalculate it
+      if (State.routePoints.length >= 2) {
+        calculateAndDisplayRoute();
+      }
+    });
+  }
+
+  // Bottom Sheet Tabs
+  if (DOM.tabBtnRoute && DOM.tabBtnSettings) {
+    DOM.tabBtnRoute.addEventListener('click', () => {
+      DOM.tabBtnRoute.classList.add('active');
+      DOM.tabBtnSettings.classList.remove('active');
+      DOM.tabContentRoute.classList.remove('hidden');
+      DOM.tabContentSettings.classList.add('hidden');
+    });
+    DOM.tabBtnSettings.addEventListener('click', () => {
+      DOM.tabBtnSettings.classList.add('active');
+      DOM.tabBtnRoute.classList.remove('active');
+      DOM.tabContentSettings.classList.remove('hidden');
+      DOM.tabContentRoute.classList.add('hidden');
+    });
+  }
+
+  // Results back button to planning mode
+  if (DOM.resultsBackBtn) {
+    DOM.resultsBackBtn.addEventListener('click', () => {
+      DOM.sheetPlanningContainer.classList.remove('hidden');
+      DOM.sheetResultsContainer.classList.add('hidden');
+      
+      // Also restore search bar if it was hidden
+      if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.remove('search-hidden');
+      if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.add('hidden');
+    });
+  }
+
+  // Undo button for clean map mode
+  if (DOM.mapUndoBtn) {
+    DOM.mapUndoBtn.addEventListener('click', () => {
+      if (State.routePoints.length > 0) {
+        State.routePoints.pop();
+        updateSearchInputsFromPoints();
+        renderRoutePoints();
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute();
+        } else {
+          MapController.clearRouteGraphics();
+          if (DOM.routeInfoSection) DOM.routeInfoSection.classList.add('hidden');
+          // If all points removed, restore search bar
+          if (State.routePoints.length === 0) {
+            if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.remove('search-hidden');
+            if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.add('hidden');
+            if (DOM.searchBarInput) DOM.searchBarInput.value = '';
+          }
+        }
+      }
+    });
+  }
+
+  // Setup settings accordions
+  const accordionTriggers = document.querySelectorAll('.accordion-trigger');
+  accordionTriggers.forEach(trigger => {
+    trigger.addEventListener('click', () => {
+      const targetId = trigger.dataset.target;
+      const content = document.getElementById(targetId);
+      if (!content) return;
+      const isCollapsed = content.classList.contains('collapsed');
+      
+      if (isCollapsed) {
+        content.classList.remove('collapsed');
+        content.style.display = 'flex';
+        trigger.classList.add('active');
+      } else {
+        content.classList.add('collapsed');
+        content.style.display = 'none';
+        trigger.classList.remove('active');
+      }
+    });
+  });
+
+
+  if (DOM.activityBikeBtn) {
+    DOM.activityBikeBtn.addEventListener('click', () => {
+      State.activeProfile = 'cycling-regular';
+      localStorage.setItem('naviapp_active_profile', 'cycling-regular');
+      
+      // Update BRouter options base profile
+      State.brouterOptions.profile = 'cycling-regular';
+      Storage.saveBRouterOptions(State.brouterOptions);
+      
+      updateActivityUI('cycling-regular');
+      syncBRouterCheckboxes();
+
+      // Update profile button UI
+      const profileBtns = document.querySelectorAll('.profile-btn');
+      profileBtns.forEach(btn => {
+        if (btn.dataset.profile === 'cycling-regular') btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      if (State.routePoints.length >= 2) {
+        calculateAndDisplayRoute(true);
+      }
+    });
+  }
+
+  if (DOM.activityFootBtn) {
+    DOM.activityFootBtn.addEventListener('click', () => {
+      State.activeProfile = 'foot-hiking';
+      localStorage.setItem('naviapp_active_profile', 'foot-hiking');
+      
+      // Update BRouter options base profile
+      State.brouterOptions.profile = 'foot-hiking';
+      Storage.saveBRouterOptions(State.brouterOptions);
+      
+      updateActivityUI('foot-hiking');
+      syncBRouterCheckboxes();
+
+      // Update profile button UI
+      const profileBtns = document.querySelectorAll('.profile-btn');
+      profileBtns.forEach(btn => {
+        if (btn.dataset.profile === 'foot-hiking') btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      if (State.routePoints.length >= 2) {
+        calculateAndDisplayRoute(true);
+      }
+    });
+  }
+
+  if (DOM.settingsProfileSelect) {
+    DOM.settingsProfileSelect.addEventListener('change', (e) => {
+      const prof = e.target.value;
+      State.activeProfile = prof;
+      localStorage.setItem('naviapp_active_profile', prof);
+      
+      // Update BRouter options
+      State.brouterOptions.profile = prof;
+      Storage.saveBRouterOptions(State.brouterOptions);
+
+      const isHiking = prof === 'foot-hiking';
+      updateActivityUI(prof);
+
+      // Sync standard profile buttons too
+      const profileBtns = document.querySelectorAll('.profile-btn');
+      profileBtns.forEach(btn => {
+        if (btn.dataset.profile === (isHiking ? 'foot-hiking' : 'cycling-regular')) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      if (State.routePoints.length >= 2) {
+        calculateAndDisplayRoute(true);
+      }
+    });
+  }
+
+  if (DOM.settingsAsphaltSelect) {
+    DOM.settingsAsphaltSelect.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.value;
+        State.brouterOptions.asphalt_preference = val;
+        Storage.saveBRouterOptions(State.brouterOptions);
+        syncBRouterCheckboxes();
+        
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute(true);
+        }
+      });
+    });
+  }
+
+  if (DOM.settingsCyclerouteSelect) {
+    DOM.settingsCyclerouteSelect.querySelectorAll('.segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.value;
+        State.brouterOptions.cycleroute_focus = val;
+        Storage.saveBRouterOptions(State.brouterOptions);
+        syncBRouterCheckboxes();
+        
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute(true);
+        }
+      });
+    });
+  }
+
+  // Define all settings toggles/inputs mapping
+  const optionMappings = [
+    { el: DOM.settingsAvoidUnsafe, key: 'avoid_unsafe' },
+    { el: DOM.settingsAvoidSteep, key: 'avoid_steep' },
+    { el: DOM.settingsOfflineCache, key: 'offline_cache' },
+    { el: DOM.settingsToggleNoise, key: 'consider_noise' },
+    { el: DOM.settingsToggleRiver, key: 'consider_river' },
+    { el: DOM.settingsToggleForest, key: 'consider_forest' },
+    { el: DOM.settingsToggleTown, key: 'consider_town' },
+    { el: DOM.settingsToggleFerries, key: 'allow_ferries' },
+    { el: DOM.settingsToggleSteps, key: 'allow_steps' },
+    { el: DOM.settingsToggleTraffic, key: 'consider_traffic' },
+    { el: DOM.settingsToggleOneway, key: 'ignore_oneway' },
+    { el: DOM.settingsToggleProposedCycleways, key: 'use_proposed_cycleroutes' },
+    { el: DOM.settingsToggleTunnel, key: 'avoid_tunnel' }
+  ];
+
+  optionMappings.forEach(m => {
+    if (m.el) {
+      m.el.addEventListener('change', (e) => {
+        State.brouterOptions[m.key] = e.target.checked;
+        Storage.saveBRouterOptions(State.brouterOptions);
+        syncBRouterCheckboxes();
+        
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute(true);
+        }
+      });
+    }
+  });
+
+  // Map Quick Options Panel checkboxes (bidirectional syncing)
+  const quickMappings = [
+    { el: DOM.brouterAllowSteps, key: 'allow_steps' },
+    { el: DOM.brouterAllowFerries, key: 'allow_ferries' },
+    { el: DOM.brouterAvoidUnsafe, key: 'avoid_unsafe' },
+    { el: DOM.brouterConsiderElevation, key: 'avoid_steep' }
+  ];
+
+  quickMappings.forEach(m => {
+    if (m.el) {
+      m.el.addEventListener('change', (e) => {
+        State.brouterOptions[m.key] = e.target.checked;
+        Storage.saveBRouterOptions(State.brouterOptions);
+        syncBRouterCheckboxes();
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute(true);
+        }
+      });
+    }
+  });
+
+  if (DOM.brouterStickToCycleroutes) {
+    DOM.brouterStickToCycleroutes.addEventListener('change', (e) => {
+      State.brouterOptions.cycleroute_focus = e.target.checked ? 'prefer' : 'neutral';
+      Storage.saveBRouterOptions(State.brouterOptions);
+      syncBRouterCheckboxes();
+      if (State.routePoints.length >= 2) {
+        calculateAndDisplayRoute(true);
+      }
+    });
+  }
+
+  // Sliders mapping
+  const sliders = [
+    { el: DOM.settingsSliderUnpaved, type: 'unpaved', key: 'unpaved_preference' },
+    { el: DOM.settingsSliderPath, type: 'path', key: 'path_preference' },
+    { el: DOM.settingsSliderCobblestone, type: 'cobblestone', key: 'cobblestone_preference' },
+    { el: DOM.settingsSliderSandmud, type: 'sandmud', key: 'sandmud_preference' },
+    { el: DOM.settingsSliderUphill, type: 'uphill', key: 'uphillcost' },
+    { el: DOM.settingsSliderDownhill, type: 'downhill', key: 'downhillcost' }
+  ];
+
+  sliders.forEach(s => {
+    if (s.el) {
+      s.el.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (s.type === 'uphill' || s.type === 'downhill') {
+          const label = document.getElementById(`slider-val-${s.type}`);
+          if (label) label.textContent = val;
+        } else {
+          updateSliderLabel(s.type, val);
+        }
+      });
+
+      s.el.addEventListener('change', (e) => {
+        State.brouterOptions[s.key] = parseInt(e.target.value);
+        Storage.saveBRouterOptions(State.brouterOptions);
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute(true);
+        }
+      });
     }
   });
 
@@ -260,6 +843,39 @@ function setupEventListeners() {
     }
     updateSearchInputsFromPoints();
     renderRoutePoints();
+    triggerAutoRouting();
+  });
+
+  setupAddressSearch(DOM.searchBarInput, DOM.searchBarResults, (loc) => {
+    // When search item is selected, it acts as destination (Zielort)
+    if (State.routePoints.length === 0) {
+      State.routePoints = [
+        { name: 'Mein Standort', lat: 0, lon: 0 },
+        loc
+      ];
+    } else if (State.routePoints.length === 1) {
+      State.routePoints.push(loc);
+    } else {
+      State.routePoints[1] = loc;
+    }
+    
+    // Try to set current location as start if start lat/lon is 0
+    if (State.routePoints[0] && State.routePoints[0].lat === 0 && Geolocation.currentPosition) {
+      State.routePoints[0] = {
+        name: 'Mein Standort',
+        lat: Geolocation.currentPosition.lat,
+        lon: Geolocation.currentPosition.lng
+      };
+    }
+    
+    updateSearchInputsFromPoints();
+    renderRoutePoints();
+    
+    // Open Bottom Sheet in planning mode (Zustand 1)
+    DOM.sheetPlanningContainer.classList.remove('hidden');
+    DOM.sheetResultsContainer.classList.add('hidden');
+    DOM.bottomSheet.classList.add('half-open');
+    
     triggerAutoRouting();
   });
 
@@ -295,6 +911,12 @@ function setupEventListeners() {
   });
 
   MapController.map.on('click', (e) => {
+    // Avoid double trigger if long press was just executed
+    if (State.longPressTriggered) {
+      State.longPressTriggered = false;
+      return;
+    }
+
     const loc = {
       name: `Kartenpunkt (${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)})`,
       lat: e.latlng.lat,
@@ -315,10 +937,137 @@ function setupEventListeners() {
       State.routePoints.push(loc);
     }
     
+    // Clean Map Mode: slide search bar up and show undo button
+    if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.add('search-hidden');
+    if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.remove('hidden');
+
     updateSearchInputsFromPoints();
     renderRoutePoints();
     triggerAutoRouting();
   });
+
+  // Long-press detection on Map
+  let pressTimer = null;
+  const cancelPressTimer = () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  };
+
+  MapController.map.on('mousedown', (e) => {
+    cancelPressTimer();
+    // Only trigger for primary clicks
+    if (e.originalEvent && e.originalEvent.button !== 0) return;
+    pressTimer = setTimeout(() => {
+      handleMapLongPress(e.latlng);
+    }, 600);
+  });
+
+  MapController.map.on('mouseup mousemove zoomstart dragstart', cancelPressTimer);
+
+  MapController.map.on('touchstart', (e) => {
+    cancelPressTimer();
+    if (e.latlng) {
+      pressTimer = setTimeout(() => {
+        handleMapLongPress(e.latlng);
+      }, 600);
+    }
+  });
+
+  MapController.map.on('touchend touchmove', cancelPressTimer);
+
+  async function handleMapLongPress(latlng) {
+    State.longPressTriggered = true;
+    
+    // Highlight pin on map
+    MapController.setLongPressMarker(latlng);
+    
+    // Save to temp state
+    State.longPressCoord = {
+      name: `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`,
+      lat: latlng.lat,
+      lon: latlng.lng
+    };
+
+    // Open Bottom Sheet in planning mode (Zustand 1)
+    DOM.sheetPlanningContainer.classList.remove('hidden');
+    DOM.sheetResultsContainer.classList.add('hidden');
+    DOM.bottomSheet.classList.add('half-open');
+
+    // Show long press actions overlay
+    DOM.longPressActions.classList.remove('hidden');
+    DOM.longPressAddress.textContent = 'Suche Adresse...';
+
+    // Reverse geocode address in background
+    try {
+      const address = await Routing.reverseGeocode(latlng.lat, latlng.lng);
+      if (address) {
+        State.longPressCoord.name = address;
+        DOM.longPressAddress.textContent = address;
+      } else {
+        DOM.longPressAddress.textContent = `Kartenpunkt (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`;
+      }
+    } catch (err) {
+      console.warn('Reverse geocoding failed:', err);
+      DOM.longPressAddress.textContent = `Kartenpunkt (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`;
+    }
+  }
+
+  // Long-press Actions Button wiring
+  if (DOM.longPressStartBtn) {
+    DOM.longPressStartBtn.addEventListener('click', () => {
+      if (State.longPressCoord) {
+        if (State.routePoints.length === 0) {
+          State.routePoints.push(State.longPressCoord);
+        } else {
+          State.routePoints[0] = State.longPressCoord;
+        }
+        
+        // Clean Map Mode trigger
+        if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.add('search-hidden');
+        if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.remove('hidden');
+        
+        updateSearchInputsFromPoints();
+        renderRoutePoints();
+        
+        DOM.longPressActions.classList.add('hidden');
+        MapController.clearLongPressMarker();
+        State.longPressCoord = null;
+        
+        triggerAutoRouting();
+      }
+    });
+  }
+
+  if (DOM.longPressWpBtn) {
+    DOM.longPressWpBtn.addEventListener('click', () => {
+      if (State.longPressCoord) {
+        State.routePoints.push(State.longPressCoord);
+        
+        // Clean Map Mode trigger
+        if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.add('search-hidden');
+        if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.remove('hidden');
+        
+        updateSearchInputsFromPoints();
+        renderRoutePoints();
+        
+        DOM.longPressActions.classList.add('hidden');
+        MapController.clearLongPressMarker();
+        State.longPressCoord = null;
+        
+        triggerAutoRouting();
+      }
+    });
+  }
+
+  if (DOM.longPressCancelBtn) {
+    DOM.longPressCancelBtn.addEventListener('click', () => {
+      DOM.longPressActions.classList.add('hidden');
+      MapController.clearLongPressMarker();
+      State.longPressCoord = null;
+    });
+  }
 
   // Profile selection
   const profileBtns = document.querySelectorAll('.profile-btn');
@@ -332,6 +1081,13 @@ function setupEventListeners() {
       // Save profile choice locally
       localStorage.setItem('naviapp_active_profile', State.activeProfile);
       
+      // Update BRouter options base profile
+      State.brouterOptions.profile = State.activeProfile;
+      Storage.saveBRouterOptions(State.brouterOptions);
+
+      updateActivityUI(State.activeProfile);
+      syncBRouterCheckboxes();
+
       // Update user position marker icon immediately if geolocation is active
       if (Geolocation.currentPosition) {
         MapController.updateUserPosition(Geolocation.currentPosition, false, State.activeProfile);
@@ -375,9 +1131,11 @@ function setupEventListeners() {
   const layerOptions = document.querySelectorAll('.layer-option');
   layerOptions.forEach(opt => {
     opt.addEventListener('click', (e) => {
+      const selectedLayer = e.target.dataset.layer;
       layerOptions.forEach(o => o.classList.remove('active'));
       e.target.classList.add('active');
-      MapController.switchLayer(e.target.dataset.layer);
+      MapController.switchLayer(selectedLayer);
+      localStorage.setItem('active_map_layer', selectedLayer);
       DOM.mapThemeMenu.classList.add('hidden');
     });
   });
@@ -438,8 +1196,11 @@ function renderRoutePoints() {
   }
 
   State.routePoints.forEach((pt, i) => {
+    if (!pt) return; // safeguard against null points
     const li = document.createElement('li');
-    li.className = 'saved-item';
+    li.className = 'saved-item drag-item';
+    li.draggable = true;
+    li.dataset.index = i;
     li.style.padding = '8px 10px';
     li.style.margin = '4px 0';
     li.style.background = 'rgba(255,255,255,0.03)';
@@ -447,6 +1208,7 @@ function renderRoutePoints() {
     li.style.display = 'flex';
     li.style.justifyContent = 'space-between';
     li.style.alignItems = 'center';
+    li.style.cursor = 'grab';
     
     const shortName = pt.name.split(',')[0];
     const isStart = i === 0;
@@ -463,18 +1225,85 @@ function renderRoutePoints() {
 
     li.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-        <span class="badge" style="background-color: ${badgeColor}; color: #121214; font-size: 0.68rem; padding: 2px 5px;">${label}</span>
-        <span style="font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${shortName}</span>
+        <span class="badge" style="background-color: ${badgeColor}; color: #121214; font-size: 0.68rem; padding: 2px 5px; flex-shrink: 0; user-select: none;">${label}</span>
+        <span style="font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;">${shortName}</span>
       </div>
-      <button class="delete-point-btn" data-index="${i}" title="Wegpunkt löschen" style="background: transparent; border: none; color: var(--text-dimmed); cursor: pointer; padding: 2px;">
-        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
-      </button>
+      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+        ${i > 0 ? `
+          <button class="move-point-btn" data-index="${i}" data-dir="up" title="Nach oben verschieben" style="background: transparent; border: none; color: var(--text-dimmed); cursor: pointer; padding: 2px;">
+            <i data-lucide="chevron-up" style="width: 14px; height: 14px;"></i>
+          </button>
+        ` : ''}
+        ${i < State.routePoints.length - 1 ? `
+          <button class="move-point-btn" data-index="${i}" data-dir="down" title="Nach unten verschieben" style="background: transparent; border: none; color: var(--text-dimmed); cursor: pointer; padding: 2px;">
+            <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+        ` : ''}
+        <button class="delete-point-btn" data-index="${i}" title="Wegpunkt löschen" style="background: transparent; border: none; color: var(--text-dimmed); cursor: pointer; padding: 2px;">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
     `;
 
+    // Delete Button Listener
     li.querySelector('.delete-point-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       const index = parseInt(e.currentTarget.dataset.index);
       removeRoutePoint(index);
+    });
+
+    // Move Button Listener (Up/Down)
+    li.querySelectorAll('.move-point-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.dataset.index);
+        const dir = btn.dataset.dir;
+        const targetIndex = dir === 'up' ? index - 1 : index + 1;
+        const moved = State.routePoints.splice(index, 1)[0];
+        State.routePoints.splice(targetIndex, 0, moved);
+        updateSearchInputsFromPoints();
+        renderRoutePoints();
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute();
+        }
+      });
+    });
+
+    // HTML5 Drag and Drop Events
+    li.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', i);
+      li.classList.add('dragging');
+      li.style.cursor = 'grabbing';
+    });
+
+    li.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      li.style.cursor = 'grab';
+    });
+
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      li.classList.add('drag-over');
+    });
+
+    li.addEventListener('dragleave', () => {
+      li.classList.remove('drag-over');
+    });
+
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      li.classList.remove('drag-over');
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = i;
+      if (fromIdx !== toIdx) {
+        const moved = State.routePoints.splice(fromIdx, 1)[0];
+        State.routePoints.splice(toIdx, 0, moved);
+        updateSearchInputsFromPoints();
+        renderRoutePoints();
+        if (State.routePoints.length >= 2) {
+          calculateAndDisplayRoute();
+        }
+      }
     });
 
     list.appendChild(li);
@@ -537,6 +1366,9 @@ function updateSearchInputsFromPoints() {
   
   // Draw intermediate waypoints (excluding start/dest)
   MapController.drawWaypoints(State.routePoints);
+
+  // Autosave current route planning
+  localStorage.setItem('planned_route', JSON.stringify(State.routePoints));
 }
 
 /**
@@ -607,7 +1439,7 @@ function setupAddressSearch(inputEl, resultsEl, onSelectCallback) {
 /**
  * Calculates directions via ORS and updates UI & Map
  */
-async function calculateAndDisplayRoute() {
+async function calculateAndDisplayRoute(isSettingsChange = false) {
   if (State.routePoints.length < 2) {
     alert('Bitte wähle mindestens zwei Wegpunkte aus.');
     return;
@@ -681,6 +1513,10 @@ async function calculateAndDisplayRoute() {
     // Save automatically to history
     saveRouteToHistory(route);
 
+    if (isSettingsChange && DOM.tabBtnRoute) {
+      DOM.tabBtnRoute.click();
+    }
+
   } catch (e) {
     alert('Fehler bei der Routenberechnung: ' + e.message);
   } finally {
@@ -693,8 +1529,6 @@ async function calculateAndDisplayRoute() {
  * Updates UI stats & Surface indicator lists
  */
 function updateRouteUI(route) {
-  DOM.routeInfoSection.classList.remove('hidden');
-  
   // Standard formatters
   const formattedDist = route.stats.distance.toFixed(1) + ' km';
   const hours = Math.floor(route.stats.duration / 3600);
@@ -703,33 +1537,83 @@ function updateRouteUI(route) {
   const gain = `+${route.stats.elevationGain} m`;
   const loss = `-${route.stats.elevationLoss} m`;
 
-  // Desktop sidebars
-  DOM.distance.textContent = formattedDist;
-  DOM.duration.textContent = formattedDur;
-  DOM.elevationGain.textContent = gain;
-  DOM.elevationLoss.textContent = loss;
+  if (DOM.distance) DOM.distance.textContent = formattedDist;
+  if (DOM.duration) DOM.duration.textContent = formattedDur;
+  if (DOM.elevationGain) DOM.elevationGain.textContent = gain;
+  if (DOM.elevationLoss) DOM.elevationLoss.textContent = loss;
 
   // Mobile Bottom Sheet
   DOM.sheetSummaryDist.textContent = formattedDist;
   DOM.sheetSummaryDur.textContent = formattedDur;
   DOM.sheetActionBtn.classList.remove('hidden');
 
+  // Update map stats ticker
+  if (DOM.mapStatsTicker) {
+    DOM.mapStatsTicker.classList.remove('hidden');
+    if (DOM.tickerDistVal) DOM.tickerDistVal.textContent = formattedDist;
+    if (DOM.tickerElevVal) DOM.tickerElevVal.textContent = `↑ ${route.stats.elevationGain}m  ↓ ${route.stats.elevationLoss}m`;
+  }
+
   // Surface rendering
   renderSurfaceBreakdown(route.surfaces);
 
-  // Sync to mobile sheet container
-  DOM.mobileRouteDetails.innerHTML = '';
-  // Clone sections for mobile view in drawer
-  const clone = DOM.routeInfoSection.cloneNode(true);
-  clone.id = 'mobile-route-info';
-  clone.classList.remove('hidden');
-  DOM.mobileRouteDetails.appendChild(clone);
-  
-  // Render elevation profile on all canvases
+  // Render elevation profile on canvas
   drawElevationProfile(route.coordinates);
+
+  // Render Turn-by-Turn directions list
+  renderNavigationInstructions(route.steps);
+
+  // Render route points list
+  renderRoutePoints();
+
+  // Transition Bottom Sheet to Zustand 2 (Results Mode)
+  DOM.sheetPlanningContainer.classList.add('hidden');
+  DOM.sheetResultsContainer.classList.remove('hidden');
   
-  // Expand mobile bottom sheet to show stats
+  // Expand bottom sheet to half-open
   DOM.bottomSheet.classList.add('half-open');
+}
+
+function renderNavigationInstructions(steps) {
+  if (!DOM.navigationInstructions) return;
+  DOM.navigationInstructions.innerHTML = '';
+  if (!steps || steps.length === 0) {
+    DOM.navigationInstructions.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-dimmed); text-align: center; padding: 12px 0;">Keine Abbiegehinweise vorhanden.</div>';
+    return;
+  }
+
+  steps.forEach((step, i) => {
+    const el = document.createElement('div');
+    el.className = 'instruction-item';
+    el.style.display = 'flex';
+    el.style.gap = '10px';
+    el.style.alignItems = 'flex-start';
+    el.style.padding = '8px 10px';
+    el.style.background = 'rgba(255,255,255,0.03)';
+    el.style.borderRadius = '8px';
+    el.style.border = '1px solid var(--color-border)';
+
+    // Get an appropriate icon based on instruction text
+    let icon = 'navigation';
+    const text = step.instruction.toLowerCase();
+    if (text.includes('links') || text.includes('left')) icon = 'arrow-up-left';
+    else if (text.includes('rechts') || text.includes('right')) icon = 'arrow-up-right';
+    else if (text.includes('geradeaus') || text.includes('straight') || text.includes('weiter')) icon = 'arrow-up';
+    else if (text.includes('kreisverkehr') || text.includes('roundabout')) icon = 'rotate-cw';
+    else if (text.includes('ankunft') || text.includes('ziel') || text.includes('arrive')) icon = 'flag';
+
+    el.innerHTML = `
+      <div style="background: rgba(16, 185, 129, 0.1); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--color-primary);">
+        <i data-lucide="${icon}" style="width: 14px; height: 14px;"></i>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <span style="font-size: 0.82rem; color: var(--text-main); display: block; line-height: 1.3;">${step.instruction}</span>
+        <span style="font-size: 0.72rem; color: var(--text-dimmed); display: block; margin-top: 2px;">In ${step.distance >= 1000 ? (step.distance / 1000).toFixed(1) + ' km' : Math.round(step.distance) + ' m'}</span>
+      </div>
+    `;
+    DOM.navigationInstructions.appendChild(el);
+  });
+  lucide.createIcons();
 }
 
 /**
@@ -769,15 +1653,33 @@ function clearRoute() {
   
   DOM.startInput.value = '';
   DOM.destInput.value = '';
+  if (DOM.searchBarInput) DOM.searchBarInput.value = '';
+  
   DOM.routeInfoSection.classList.add('hidden');
+  DOM.longPressActions.classList.add('hidden');
+  MapController.clearLongPressMarker();
+
+  // Clean Map Mode Reset
+  if (DOM.floatingSearchBar) DOM.floatingSearchBar.classList.remove('search-hidden');
+  if (DOM.mapUndoBtn) DOM.mapUndoBtn.classList.add('hidden');
   
   // Reset Bottom sheet
   DOM.sheetSummaryDist.textContent = '0.0 km';
   DOM.sheetSummaryDur.textContent = '00:00';
   DOM.bottomSheet.classList.remove('half-open', 'fully-open');
+
+  // Show planning and hide results container
+  DOM.sheetPlanningContainer.classList.remove('hidden');
+  DOM.sheetResultsContainer.classList.add('hidden');
   
   MapController.clearRouteGraphics();
   renderRoutePoints();
+
+  // Remove autosave route
+  localStorage.removeItem('planned_route');
+
+  // Hide map stats ticker
+  if (DOM.mapStatsTicker) DOM.mapStatsTicker.classList.add('hidden');
 }
 
 /**
@@ -1384,4 +2286,377 @@ function drawElevationProfile(coordinates) {
     ctx.lineWidth = 2;
     ctx.stroke();
   });
+}
+
+/**
+ * Initialisiert das MagicTrack AI Modal, Event Listener und Slider-Dynamik
+ */
+function initMagicTrack() {
+  if (!DOM.magicTrackBtn) return;
+
+  // Hilfsfunktion: Formatierung der Slider-Dauer in Std/Min
+  const formatTime = (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}:${m.toString().padStart(2, '0')} Std` : `${m} Min`;
+  };
+
+  // Hilfsfunktion: Update der Slider-Tracks
+  const updateSliderTrack = (minEl, maxEl, trackEl, valEl, type) => {
+    let minVal = parseInt(minEl.value);
+    let maxVal = parseInt(maxEl.value);
+
+    if (minVal > maxVal) {
+      if (document.activeElement === minEl) {
+        maxEl.value = minVal;
+        maxVal = minVal;
+      } else {
+        minEl.value = maxVal;
+        minVal = maxVal;
+      }
+    }
+
+    if (type === 'length') {
+      valEl.textContent = `${minVal} - ${maxVal} km`;
+    } else {
+      valEl.textContent = `${formatTime(minVal)} - ${formatTime(maxVal)}`;
+    }
+
+    const minPercent = ((minVal - minEl.min) / (minEl.max - minEl.min)) * 100;
+    const maxPercent = ((maxVal - minEl.min) / (minEl.max - minEl.min)) * 100;
+    trackEl.style.background = `linear-gradient(to right, rgba(255, 255, 255, 0.1) ${minPercent}%, var(--color-primary) ${minPercent}%, var(--color-primary) ${maxPercent}%, rgba(255, 255, 255, 0.1) ${maxPercent}%)`;
+  };
+
+  // Event Listener für Dual-Slider (Länge)
+  if (DOM.magicLengthMin && DOM.magicLengthMax) {
+    const updateLength = () => updateSliderTrack(DOM.magicLengthMin, DOM.magicLengthMax, DOM.magicLengthTrack, DOM.magicLengthVal, 'length');
+    DOM.magicLengthMin.addEventListener('input', updateLength);
+    DOM.magicLengthMax.addEventListener('input', updateLength);
+    updateLength(); // Initialer Aufruf
+  }
+
+  // Event Listener für Dual-Slider (Dauer)
+  if (DOM.magicTimeMin && DOM.magicTimeMax) {
+    const updateTime = () => updateSliderTrack(DOM.magicTimeMin, DOM.magicTimeMax, DOM.magicTimeTrack, DOM.magicTimeVal, 'time');
+    DOM.magicTimeMin.addEventListener('input', updateTime);
+    DOM.magicTimeMax.addEventListener('input', updateTime);
+    updateTime(); // Initialer Aufruf
+  }
+
+  // Modal öffnen
+  DOM.magicTrackBtn.addEventListener('click', () => {
+    DOM.magicTrackModal.classList.remove('hidden');
+    
+    // UI-Zustand zurücksetzen
+    DOM.magicInputState.classList.remove('hidden');
+    DOM.magicLoadingState.classList.add('hidden');
+    DOM.magicResultState.classList.add('hidden');
+    DOM.magicGpsStatus.textContent = '';
+
+    // Falls bereits Startpunkt in Hauptanwendung gesetzt, übernehmen
+    if (State.routePoints.length > 0) {
+      DOM.magicStartInput.value = State.routePoints[0].name;
+      State.magicStartCoord = { ...State.routePoints[0] };
+    } else {
+      DOM.magicStartInput.value = '';
+      State.magicStartCoord = null;
+    }
+  });
+
+  // Modal schließen
+  DOM.closeMagicModalBtn.addEventListener('click', () => {
+    DOM.magicTrackModal.classList.add('hidden');
+  });
+
+  // Schließen bei Klick außerhalb der Modal-Card
+  DOM.magicTrackModal.addEventListener('click', (e) => {
+    if (e.target === DOM.magicTrackModal) {
+      DOM.magicTrackModal.classList.add('hidden');
+    }
+  });
+
+  // GPS Standortbestimmung im Modal
+  DOM.magicGpsBtn.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      DOM.magicGpsStatus.textContent = 'GPS nicht unterstützt';
+      DOM.magicGpsStatus.style.color = '#ef4444';
+      return;
+    }
+
+    DOM.magicGpsStatus.textContent = 'Ermittle Standort...';
+    DOM.magicGpsStatus.style.color = 'var(--text-muted)';
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        DOM.magicGpsStatus.textContent = 'Suche Adresse...';
+
+        const address = await Routing.reverseGeocode(lat, lon);
+        DOM.magicStartInput.value = address;
+        State.magicStartCoord = {
+          name: address,
+          lat: lat,
+          lon: lon
+        };
+        DOM.magicGpsStatus.textContent = 'Standort erfolgreich erfasst';
+        DOM.magicGpsStatus.style.color = 'var(--color-primary)';
+      },
+      (error) => {
+        console.error('GPS Modal Error:', error);
+        DOM.magicGpsStatus.textContent = 'GPS-Ortung fehlgeschlagen';
+        DOM.magicGpsStatus.style.color = '#ef4444';
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
+
+  // KI-Routen-Generierung
+  DOM.magicGenerateBtn.addEventListener('click', async () => {
+    const startText = DOM.magicStartInput.value.trim();
+    if (!startText) {
+      DOM.magicStartInput.focus();
+      return;
+    }
+
+    // Lade-Zustand aktivieren
+    DOM.magicInputState.classList.add('hidden');
+    DOM.magicLoadingState.classList.remove('hidden');
+    DOM.magicResultState.classList.add('hidden');
+
+    DOM.magicStep1.className = 'loading-step active';
+    DOM.magicStep2.className = 'loading-step';
+    DOM.magicStep3.className = 'loading-step';
+    DOM.magicLoadingTitle.textContent = 'MagicTrack läuft...';
+    DOM.magicLoadingDesc.textContent = 'Die KI webt deine perfekte Route zusammen.';
+
+    try {
+      // 1. Startkoordinaten validieren / geokodieren falls nötig
+      if (!State.magicStartCoord || State.magicStartCoord.name !== startText) {
+        DOM.magicLoadingDesc.textContent = 'Geokodiere Startort...';
+        const searchRes = await Routing.searchAddress(startText);
+        if (searchRes && searchRes.length > 0) {
+          State.magicStartCoord = {
+            name: searchRes[0].name,
+            lat: searchRes[0].lat,
+            lon: searchRes[0].lon
+          };
+        } else {
+          throw new Error('Startort konnte nicht geokodiert werden. Bitte gebe einen gültigen Ort an.');
+        }
+      }
+
+      // 2. Gemini-API aufrufen (Schritt 1)
+      DOM.magicLoadingDesc.textContent = 'Rufe Gemini-API auf...';
+      const lengthMin = parseInt(DOM.magicLengthMin.value);
+      const lengthMax = parseInt(DOM.magicLengthMax.value);
+      const timeMin = parseInt(DOM.magicTimeMin.value);
+      const timeMax = parseInt(DOM.magicTimeMax.value);
+      const effort = DOM.magicEffortSelect.value;
+      const freeText = DOM.magicFreeText.value.trim();
+      const currentProfile = State.activeProfile === 'foot-hiking' ? 'hiking' : 'trekking';
+
+      let routeData = await Routing.generateMagicTrackRoute({
+        lengthMin,
+        lengthMax,
+        timeMin,
+        timeMax,
+        effort,
+        startLocation: State.magicStartCoord.name,
+        profile: currentProfile,
+        freeText
+      });
+
+      // 3. Wegpunkte geokodieren (Schritt 2)
+      DOM.magicStep1.className = 'loading-step';
+      DOM.magicStep2.className = 'loading-step active';
+      DOM.magicLoadingDesc.textContent = 'Berechne Zwischenstationen...';
+
+      const points = [];
+      // Startpunkt hinzufügen
+      points.push({
+        name: State.magicStartCoord.name,
+        lat: State.magicStartCoord.lat,
+        lon: State.magicStartCoord.lon
+      });
+
+      // Viewbox einschränken (ca. 40km Radius um den Startort)
+      const delta = 0.4;
+      const viewbox = `${State.magicStartCoord.lon - delta},${State.magicStartCoord.lat + delta},${State.magicStartCoord.lon + delta},${State.magicStartCoord.lat - delta}`;
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+      const waypointsToGeocode = routeData.semantic_waypoints || [];
+      
+      // Nur die Zwischenstationen geokodieren (Start und Ziel sind identisch)
+      for (let i = 0; i < waypointsToGeocode.length; i++) {
+        const wpName = waypointsToGeocode[i];
+        
+        // Überspringe, wenn Name dem Startort sehr ähnelt und es der erste/letzte ist
+        const isFirstOrLast = i === 0 || i === waypointsToGeocode.length - 1;
+        if (isFirstOrLast && (wpName.toLowerCase().includes('startort') || wpName.toLowerCase().includes(startText.split(',')[0].toLowerCase()))) {
+          continue;
+        }
+
+        DOM.magicLoadingDesc.textContent = `Geokodiere: ${wpName}...`;
+        const geocodeRes = await Routing.searchAddress(wpName, viewbox, true);
+        
+        if (geocodeRes && geocodeRes.length > 0) {
+          points.push({
+            name: geocodeRes[0].name,
+            lat: geocodeRes[0].lat,
+            lon: geocodeRes[0].lon
+          });
+        }
+
+        // OSM Policy Delay
+        if (i < waypointsToGeocode.length - 1) {
+          await sleep(800);
+        }
+      }
+
+      // Zielpunkt (wieder der Startpunkt für eine geschlossene Runde)
+      points.push({
+        name: State.magicStartCoord.name,
+        lat: State.magicStartCoord.lat,
+        lon: State.magicStartCoord.lon
+      });
+
+      // Validierung
+      if (points.length < 2) {
+        throw new Error('Es konnten keine Zwischenstationen geokodiert werden.');
+      }
+
+      // 4. BRouter-Route berechnen (Schritt 3)
+      DOM.magicStep2.className = 'loading-step';
+      DOM.magicStep3.className = 'loading-step active';
+      DOM.magicLoadingDesc.textContent = 'Berechne ideale Wegführung...';
+
+      const resolvedProfile = routeData.brouter_profile || (State.activeProfile === 'foot-hiking' ? 'hiking' : 'trekking');
+      const finalRoute = await Routing.getRoute(
+        points,
+        resolvedProfile,
+        State.routingEngine,
+        State.apiKey,
+        State.brouterOptions
+      );
+
+      // Ergebnis speichern
+      State.magicResult = {
+        route: finalRoute,
+        points: points,
+        reply: routeData.chat_reply
+      };
+
+      // Ergebnis anzeigen
+      DOM.magicLoadingState.classList.add('hidden');
+      DOM.magicResultState.classList.remove('hidden');
+
+      DOM.magicResultReply.textContent = routeData.chat_reply;
+
+      // Liste der Wegpunkte rendern
+      DOM.magicResultWaypoints.innerHTML = '';
+      points.forEach((pt, idx) => {
+        // Ignoriere den letzten doppelten Zielpunkt in der UI-Liste, falls Start und Ziel identisch sind
+        if (idx === points.length - 1 && idx > 0 && pt.lat === points[0].lat && pt.lon === points[0].lon) {
+          return;
+        }
+        
+        const shortName = pt.name.split(',')[0];
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.gap = '8px';
+        item.style.padding = '4px 0';
+        
+        const isStart = idx === 0;
+        let badgeColor = 'var(--text-dimmed)';
+        let label = `${idx + 1}`;
+        if (isStart) {
+          badgeColor = 'var(--color-secondary)';
+          label = 'Start';
+        }
+
+        item.innerHTML = `
+          <span class="badge" style="background-color: ${badgeColor}; color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block;">${label}</span>
+          <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${shortName}</span>
+        `;
+        DOM.magicResultWaypoints.appendChild(item);
+      });
+
+      // Ein letztes Badge für das Ziel anzeigen, um die Schleife zu verdeutlichen
+      if (points.length > 1) {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.gap = '8px';
+        item.style.padding = '4px 0';
+        item.innerHTML = `
+          <span class="badge" style="background-color: var(--color-primary); color: #121214; font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; font-weight: bold; width: 34px; text-align: center; display: inline-block;">Ziel</span>
+          <span style="font-size: 0.84rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${points[0].name.split(',')[0]}</span>
+        `;
+        DOM.magicResultWaypoints.appendChild(item);
+      }
+
+      lucide.createIcons();
+
+    } catch (err) {
+      console.error('MagicTrack Error:', err);
+      alert('Fehler bei der Generierung: ' + err.message);
+      
+      // Zurück zum Eingabezustand
+      DOM.magicLoadingState.classList.add('hidden');
+      DOM.magicInputState.classList.remove('hidden');
+    }
+  });
+
+  // Route auf Karte anwenden
+  DOM.magicResultApplyBtn.addEventListener('click', () => {
+    if (!State.magicResult) return;
+
+    DOM.magicTrackModal.classList.add('hidden');
+
+    // 1. State-Variablen anpassen
+    State.routePoints = [...State.magicResult.points];
+    State.calculatedRoute = State.magicResult.route;
+
+    // 2. UI-Eingabefelder und Listen synchronisieren
+    updateSearchInputsFromPoints();
+    renderRoutePoints();
+
+    // 3. Route auf Karte zeichnen und einpassen
+    MapController.drawRoute(State.magicResult.route.geojson, State.magicResult.route.segments);
+    
+    // 4. Statistiken in Sidebar und Mobile Sheet rendern
+    updateRouteUI(State.magicResult.route);
+
+    // 5. Automatisch im Speicher/Verlauf ablegen
+    saveRouteToHistory(State.magicResult.route);
+  });
+
+  // Zurück zur Parametereingabe
+  DOM.magicResultEditBtn.addEventListener('click', () => {
+    DOM.magicResultState.classList.add('hidden');
+    DOM.magicInputState.classList.remove('hidden');
+  });
+}
+
+/**
+ * Erstellt Mock-Daten für die Routengenerierung im lokalen Modus
+ */
+function getMockRouteData(startText, activeProfile) {
+  const city = startText.split(',')[0].trim();
+  const isHiking = activeProfile === 'foot-hiking';
+  if (isHiking) {
+    return {
+      "chat_reply": `Hier ist ein lokaler Wandervorschlag rund um "${city}". Die Route führt dich durch schöne Naturpfade und Aussichtspunkte der Region.`,
+      "brouter_profile": "hiking",
+      "semantic_waypoints": [startText, `Aussichtspunkt, ${city}`, `Waldweg, ${city}`, `Park, ${city}`, startText]
+    };
+  } else {
+    return {
+      "chat_reply": `Ich habe eine tolle Radroute ab "${city}" zusammengestellt. Wir fahren durch verkehrsarme Straßen und Radwege der Gegend.`,
+      "brouter_profile": "trekking",
+      "semantic_waypoints": [startText, `Rathaus, ${city}`, `See, ${city}`, `Flussweg, ${city}`, startText]
+    };
+  }
 }
