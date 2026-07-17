@@ -395,15 +395,6 @@
               <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--color-primary); margin-bottom: 10px; letter-spacing: 0.5px; font-weight: 700;">Level 1: Basis</h4>
               <div style="display: flex; flex-direction: column; gap: 12px;">
                 
-                <!-- Routen-Profil -->
-                <div class="form-row" style="display: flex; flex-direction: column; gap: 4px;">
-                  <label for="settings-profile-select" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Routen-Profil</label>
-                  <select id="settings-profile-select" style="background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; color: var(--text-main); font-family: inherit; font-size: 0.85rem; width: 100%;">
-                    <option value="cycling-regular" selected>Gravel / Trekking</option>
-                    <option value="cycling-road">Rennrad</option>
-                    <option value="foot-hiking">Wandern</option>
-                  </select>
-                </div>
 
                 <!-- Asphalt-Präferenz (3-Wege-Schalter) -->
                 <div class="form-row" style="display: flex; flex-direction: column; gap: 4px;">
@@ -592,9 +583,8 @@
       <div class="modal-body">
         <div class="form-group">
           <label for="routing-engine-select">Routing-Dienst</label>
-          <select id="routing-engine-select" style="background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.92rem; width: 100%;">
-            <option value="brouter" selected>BRouter</option>
-            <option value="ors">OpenRouteService</option>
+          <select id="routing-engine-select" disabled style="background: rgba(255,255,255,0.03); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-dimmed); font-family: inherit; font-size: 0.92rem; width: 100%; cursor: not-allowed;">
+            <option value="brouter" selected>BRouter (Festgelegt)</option>
           </select>
         </div>
 
@@ -870,9 +860,8 @@
           
           <div class="form-group" style="margin-bottom: 20px;">
             <label for="page-routing-engine-select" style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem;">Routing-Dienst</label>
-            <select id="page-routing-engine-select" style="background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.92rem; width: 100%;">
-              <option value="brouter" selected>BRouter (Empfohlen)</option>
-              <option value="ors">OpenRouteService</option>
+            <select id="page-routing-engine-select" disabled style="background: rgba(255,255,255,0.03); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-dimmed); font-family: inherit; font-size: 0.92rem; width: 100%; cursor: not-allowed;">
+              <option value="brouter" selected>BRouter (Festgelegt)</option>
             </select>
           </div>
 

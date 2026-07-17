@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vialo-shell-v15';
+const CACHE_NAME = 'vialo-shell-v19';
 const TILE_CACHE_NAME = 'vialo-tiles-v1';
 
 const ASSETS_TO_CACHE = [
@@ -14,6 +14,7 @@ const ASSETS_TO_CACHE = [
   './js/gpx.js',
   './js/storage.js',
   './js/overpass.js',
+  './js/opfs-tile-store.js',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   // Local resources

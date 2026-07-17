@@ -47,7 +47,8 @@ const State = {
   oledSaveModeActive: false,
   autoReRoutingEnabled: false,
   sheetStatePushed: false,
-  routeStatePushed: false
+  routeStatePushed: false,
+  settingsPagePushed: false
 };
 
 // DOM Elements
@@ -534,18 +535,18 @@ function loadSettings() {
 function setupEventListeners() {
   // Sidebar Toggles
   if (DOM.userMenuBtn) {
-    DOM.userMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
+    DOM.userMenuBtn.addEventListener('click', openSettingsPage);
   }
   if (DOM.closeSidebarBtn) {
     DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
   }
 
-  // Settings Modal
-  const openSettings = async () => {
-    DOM.settingsModal.classList.remove('hidden');
-    await updateCacheSizeDisplay();
-  };
-  if (DOM.settingsBtnDesktop) DOM.settingsBtnDesktop.addEventListener('click', openSettings);
+  if (DOM.settingsBtnDesktop) {
+    DOM.settingsBtnDesktop.addEventListener('click', () => {
+      if (DOM.sidebar) DOM.sidebar.classList.remove('open');
+      openSettingsPage();
+    });
+  }
   
   if (DOM.closeModalBtn) DOM.closeModalBtn.addEventListener('click', () => DOM.settingsModal.classList.add('hidden'));
   if (DOM.saveSettingsBtn) {
@@ -731,10 +732,6 @@ function setupEventListeners() {
         State.brouterOptions.asphalt_preference = val;
         Storage.saveBRouterOptions(State.brouterOptions);
         syncBRouterCheckboxes();
-        
-        if (State.routePoints.length >= 2) {
-          calculateAndDisplayRoute(true);
-        }
       });
     });
   }
@@ -746,10 +743,6 @@ function setupEventListeners() {
         State.brouterOptions.cycleroute_focus = val;
         Storage.saveBRouterOptions(State.brouterOptions);
         syncBRouterCheckboxes();
-        
-        if (State.routePoints.length >= 2) {
-          calculateAndDisplayRoute(true);
-        }
       });
     });
   }
@@ -777,10 +770,6 @@ function setupEventListeners() {
         State.brouterOptions[m.key] = e.target.checked;
         Storage.saveBRouterOptions(State.brouterOptions);
         syncBRouterCheckboxes();
-        
-        if (State.routePoints.length >= 2) {
-          calculateAndDisplayRoute(true);
-        }
       });
     }
   });
@@ -810,9 +799,6 @@ function setupEventListeners() {
       s.el.addEventListener('change', (e) => {
         State.brouterOptions[s.key] = parseInt(e.target.value);
         Storage.saveBRouterOptions(State.brouterOptions);
-        if (State.routePoints.length >= 2) {
-          calculateAndDisplayRoute(true);
-        }
       });
     }
   });
@@ -1218,6 +1204,7 @@ function setupEventListeners() {
 
 
   // Bottom Sheet Mobile Drag Gestures
+  initSettingsPageListeners();
   setupBottomSheetGestures();
 }
 
@@ -2754,6 +2741,14 @@ function setupBottomSheetGestures() {
   window.addEventListener('popstate', (e) => {
     const state = e.state || {};
 
+    // ── Handle Settings Page Close/Open ────────────────
+    if (State.settingsPagePushed && !state.settingsOpen) {
+      closeSettingsPage(true);
+    } else if (state.settingsOpen) {
+      openSettingsPage();
+      return;
+    }
+
     if (state.sheetOpen) {
       // The new state is that the sheet is open
       DOM.bottomSheet.classList.add('fully-open');
@@ -4278,4 +4273,243 @@ function showReRouteBannerAlert() {
     alertEl.style.opacity = '0';
     setTimeout(() => alertEl.remove(), 500);
   }, 2500);
+}
+
+/**
+ * Fullscreen Settings Page Handling & Tab Switching
+ */
+function openSettingsPage() {
+  const page = document.getElementById('settings-page');
+  if (page) {
+    page.classList.remove('hidden');
+    
+    // Load state values into the page inputs
+    document.getElementById('page-routing-engine-select').value = State.routingEngine;
+    document.getElementById('page-offline-tiles-checkbox').checked = State.brouterOptions.offline_cache !== false;
+    document.getElementById('page-auto-reroute-checkbox').checked = State.autoReRoutingEnabled;
+    
+    updatePageCacheSizeDisplay();
+    renderOfflineZonesList();
+
+    // Register PWA popstate history entry if not already set
+    if (!State.settingsPagePushed) {
+      history.pushState({ settingsOpen: true }, '');
+      State.settingsPagePushed = true;
+    }
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons({ nodes: [page] });
+    }
+  }
+}
+
+function closeSettingsPage(isPopState = false) {
+  const page = document.getElementById('settings-page');
+  if (page) {
+    page.classList.add('hidden');
+    if (State.settingsPagePushed && !isPopState) {
+      State.settingsPagePushed = false;
+      history.back();
+    }
+    State.settingsPagePushed = false;
+  }
+}
+
+async function updatePageCacheSizeDisplay() {
+  const pageLabel = document.getElementById('page-cache-size-label');
+  if (!pageLabel) return;
+
+  if (!('caches' in window)) {
+    pageLabel.textContent = 'Nicht unterstützt';
+    return;
+  }
+
+  try {
+    let size = 0;
+    const keys = await caches.keys();
+    for (const key of keys) {
+      const cache = await caches.open(key);
+      const requests = await cache.keys();
+      for (const req of requests) {
+        const res = await cache.match(req);
+        if (res) {
+          const blob = await res.blob();
+          size += blob.size;
+        }
+      }
+    }
+
+    // Traverse and add OPFS size
+    const getDirSize = async (dirHandle) => {
+      let total = 0;
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          total += file.size;
+        } else if (entry.kind === 'directory') {
+          total += await getDirSize(entry);
+        }
+      }
+      return total;
+    };
+
+    try {
+      const root = await navigator.storage.getDirectory();
+      const tilesDir = await root.getDirectoryHandle("tiles", { create: false });
+      const opfsSize = await getDirSize(tilesDir);
+      size += opfsSize;
+    } catch (err) {
+      // Ignore if folder doesn't exist
+    }
+
+    const sizeMb = (size / (1024 * 1024)).toFixed(2);
+    pageLabel.textContent = `${sizeMb} MB`;
+    if (DOM.cacheSizeLabel) {
+      DOM.cacheSizeLabel.textContent = `${sizeMb} MB belegt`;
+    }
+  } catch (e) {
+    console.error('Error calculating cache size:', e);
+    pageLabel.textContent = 'Unbekannt';
+  }
+}
+
+async function renderOfflineZonesList() {
+  const listEl = document.getElementById('offline-zones-list');
+  if (!listEl) return;
+
+  try {
+    const zones = await OpfsTileStore.getCachedZones();
+    listEl.innerHTML = '';
+
+    if (zones.length === 0) {
+      listEl.innerHTML = '<div class="no-zones-msg">Keine gespeicherten Ausschnitte vorhanden.</div>';
+      return;
+    }
+
+    zones.forEach(zone => {
+      const li = document.createElement('li');
+      li.className = 'offline-zone-item';
+      
+      const dateStr = new Date(zone.timestamp).toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      li.innerHTML = `
+        <div class="offline-zone-info">
+          <span class="offline-zone-name">Ausschnitt (${zone.lat.toFixed(4)}, ${zone.lng.toFixed(4)})</span>
+          <span class="offline-zone-meta">Radius: ${zone.radiusKm} km • ${dateStr}</span>
+        </div>
+        <button class="delete-zone-btn" data-timestamp="${zone.timestamp}" title="Diesen Ausschnitt löschen">
+          <i data-lucide="trash-2"></i>
+        </button>
+      `;
+      listEl.appendChild(li);
+    });
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons({ nodes: [listEl] });
+    }
+
+    // Bind delete buttons
+    listEl.querySelectorAll('.delete-zone-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const timestamp = parseInt(btn.getAttribute('data-timestamp'));
+        if (confirm('Möchtest du diesen gespeicherten Kartenausschnitt und seine Offline-Kacheln löschen?')) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i>';
+          lucide.createIcons({ nodes: [btn] });
+
+          const updatedZones = await OpfsTileStore.deleteCachedZone(timestamp);
+          MapController.drawCachedZones(updatedZones);
+          
+          await renderOfflineZonesList();
+          await updatePageCacheSizeDisplay();
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error('Error rendering offline zones list:', err);
+    listEl.innerHTML = '<div class="no-zones-msg" style="color: var(--color-danger);">Fehler beim Laden der Ausschnitte.</div>';
+  }
+}
+
+// Setup fullscreen settings listeners
+function initSettingsPageListeners() {
+  const backBtn = document.getElementById('settings-page-back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => closeSettingsPage(false));
+  }
+
+  // Tabs switching
+  const tabLinks = document.querySelectorAll('.settings-tab-link');
+  tabLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      const tabName = link.getAttribute('data-tab');
+      
+      tabLinks.forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+      
+      const sections = document.querySelectorAll('.settings-section');
+      sections.forEach(s => s.classList.remove('active'));
+      
+      const targetSec = document.getElementById(`settings-tab-${tabName}`);
+      if (targetSec) targetSec.classList.add('active');
+    });
+  });
+
+  // Auto save on settings change
+  const engineSelect = document.getElementById('page-routing-engine-select');
+  const offlineCheckbox = document.getElementById('page-offline-tiles-checkbox');
+  const autoRerouteCheckbox = document.getElementById('page-auto-reroute-checkbox');
+
+  const savePageSettings = () => {
+    if (!engineSelect || !offlineCheckbox || !autoRerouteCheckbox) return;
+
+    const engine = engineSelect.value;
+    const offline = offlineCheckbox.checked;
+    const autoReroute = autoRerouteCheckbox.checked;
+
+    localStorage.setItem('auto_re_routing', autoReroute);
+    State.autoReRoutingEnabled = autoReroute;
+    State.routingEngine = engine;
+    Storage.saveRoutingEngine(engine);
+    
+    State.brouterOptions.offline_cache = offline;
+    Storage.saveBRouterOptions(State.brouterOptions);
+    
+    loadSettings();
+    if (State.routePoints.length >= 2) {
+      calculateAndDisplayRoute();
+    }
+  };
+
+  if (engineSelect) engineSelect.addEventListener('change', savePageSettings);
+  if (offlineCheckbox) offlineCheckbox.addEventListener('change', savePageSettings);
+  if (autoRerouteCheckbox) autoRerouteCheckbox.addEventListener('change', savePageSettings);
+
+  // Clear all cache button
+  const clearCacheBtn = document.getElementById('page-clear-cache-btn');
+  if (clearCacheBtn) {
+    clearCacheBtn.addEventListener('click', async () => {
+      if (confirm('Möchtest du wirklich alle Offline-Daten und den gesamten Karten-Cache löschen?')) {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          if (key.includes('tiles')) {
+            await caches.delete(key);
+          }
+        }
+        await OpfsTileStore.clearAllTiles();
+        MapController.drawCachedZones([]);
+        
+        await renderOfflineZonesList();
+        await updatePageCacheSizeDisplay();
+        alert('Alle Offline-Karten und Cache-Daten wurden gelöscht.');
+      }
+    });
+  }
 }
