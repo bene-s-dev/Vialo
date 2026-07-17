@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vialo-shell-v3';
+const CACHE_NAME = 'vialo-shell-v9';
 const TILE_CACHE_NAME = 'vialo-tiles-v1';
 
 const ASSETS_TO_CACHE = [
@@ -70,24 +70,41 @@ self.addEventListener('fetch', (event) => {
     requestUrl.pathname.includes('/tile/');
 
   if (isTileRequest) {
-    // Cache-first, fall back to network, stale-while-revalidate for map tiles
-    event.respondWith(
-      caches.open(TILE_CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchPromise = fetch(event.request).then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => {
-            // Ignore network errors in background
-          });
+    let layer = 'osm';
+    if (requestUrl.hostname.includes('opentopomap')) layer = 'opentopo';
+    else if (requestUrl.hostname.includes('cyclosm')) layer = 'cyclosm';
 
-          // Return cached tile if available, otherwise wait for network
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
+    const tileMatch = requestUrl.pathname.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);
+
+    if (tileMatch) {
+      const z = tileMatch[1];
+      const x = tileMatch[2];
+      const y = tileMatch[3];
+
+      event.respondWith(
+        (async () => {
+          try {
+            // Check OPFS storage first
+            const root = await self.navigator.storage.getDirectory();
+            const tilesDir = await root.getDirectoryHandle("tiles", { create: false });
+            const layerDir = await tilesDir.getDirectoryHandle(layer, { create: false });
+            const zDir = await layerDir.getDirectoryHandle(z, { create: false });
+            const xDir = await zDir.getDirectoryHandle(x, { create: false });
+            const fileHandle = await xDir.getFileHandle(`${y}.png`, { create: false });
+            const file = await fileHandle.getFile();
+            
+            return new Response(file, {
+              headers: { 'Content-Type': 'image/png' }
+            });
+          } catch (err) {
+            // Fallback to cache/network
+            return fetchTileFromCacheOrNetwork(event.request);
+          }
+        })()
+      );
+    } else {
+      event.respondWith(fetchTileFromCacheOrNetwork(event.request));
+    }
   } else {
     // Network-first with cache fallback for app shell assets
     event.respondWith(
@@ -119,3 +136,22 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+/**
+ * Standard stale-while-revalidate Cache/Network fallback for map tiles.
+ */
+function fetchTileFromCacheOrNetwork(request) {
+  return caches.open(TILE_CACHE_NAME).then((cache) => {
+    return cache.match(request).then((cachedResponse) => {
+      const fetchPromise = fetch(request).then((networkResponse) => {
+        if (networkResponse.status === 200) {
+          cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+      }).catch(() => {
+        // network failure
+      });
+      return cachedResponse || fetchPromise;
+    });
+  });
+}

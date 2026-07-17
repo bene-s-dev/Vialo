@@ -68,7 +68,8 @@ export const MapController = {
     accuracy: null,
     pois: [],
     waypoints: [],
-    longPress: null
+    longPress: null,
+    scrubbing: null
   },
   routePolyline: null,
   routeHighlightPolyline: null,
@@ -87,20 +88,29 @@ export const MapController = {
       attributionControl: true
     }).setView(defaultCoords, defaultZoom);
 
-    // Set up standard tile layers
+    // Set up standard tile layers with enlarged buffer parameters for smooth rotations
     this.layers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap',
+      keepBuffer: 6,
+      updateWhenIdle: false,
+      updateInterval: 50
     });
 
     this.layers.opentopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       maxZoom: 17,
-      attribution: '&copy; OpenTopoMap'
+      attribution: '&copy; OpenTopoMap',
+      keepBuffer: 6,
+      updateWhenIdle: false,
+      updateInterval: 50
     });
 
     this.layers.cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
       maxZoom: 20,
-      attribution: '&copy; CyclOSM &amp; OpenStreetMap'
+      attribution: '&copy; CyclOSM &amp; OpenStreetMap',
+      keepBuffer: 6,
+      updateWhenIdle: false,
+      updateInterval: 50
     });
 
     // Add standard layer
@@ -427,6 +437,38 @@ export const MapController = {
   },
 
   /**
+   * Updates or draws the interactive elevation scrubbing indicator marker on the map.
+   * @param {Array} latlng [lat, lng]
+   */
+  updateScrubbingMarker(latlng) {
+    if (this.markers.scrubbing) {
+      this.markers.scrubbing.setLatLng(latlng);
+    } else {
+      const scrubIcon = L.divIcon({
+        html: `
+          <div style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; position: relative;">
+            <div style="position: absolute; width: 22px; height: 22px; border-radius: 50%; background: rgba(252, 82, 0, 0.35); animation: marker-pulse 1.8s infinite ease-out;"></div>
+            <div style="position: relative; width: 10px; height: 10px; border-radius: 50%; background: #FC5200; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.4); z-index: 2;"></div>
+          </div>`,
+        className: 'custom-div-icon',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      this.markers.scrubbing = L.marker(latlng, { icon: scrubIcon, zIndexOffset: 3000 }).addTo(this.map);
+    }
+  },
+
+  /**
+   * Removes the scrubbing indicator marker
+   */
+  clearScrubbingMarker() {
+    if (this.markers.scrubbing) {
+      this.map.removeLayer(this.markers.scrubbing);
+      this.markers.scrubbing = null;
+    }
+  },
+
+  /**
    * Rotates the entire map by rotating the #map container element.
    * This avoids coordinate-system drift caused by rotating individual panes.
    * @param {number} bearing Device heading in degrees (0 = north)
@@ -451,5 +493,69 @@ export const MapController = {
     }, 260); // slightly after the CSS transition ends (250ms)
 
     this._currentBearing = bearing;
+  },
+
+  /**
+   * Shows the semi-transparent helper circle for selecting the offline download zone.
+   * Centered at map center, fixed radius of 5 km.
+   */
+  showOfflineDownloadZone() {
+    this.hideOfflineDownloadZone();
+
+    const center = this.map.getCenter();
+    this.offlineDownloadCircle = L.circle(center, {
+      radius: 5000, // 5 km
+      color: '#FC5200',
+      fillColor: '#FC5200',
+      fillOpacity: 0.12,
+      weight: 2,
+      dashArray: '6, 6',
+      interactive: false
+    }).addTo(this.map);
+
+    // Update position on map pan/move
+    this._onMapMoveForDownload = () => {
+      if (this.offlineDownloadCircle) {
+        this.offlineDownloadCircle.setLatLng(this.map.getCenter());
+      }
+    };
+    this.map.on('move', this._onMapMoveForDownload);
+  },
+
+  /**
+   * Hides the offline download helper circle.
+   */
+  hideOfflineDownloadZone() {
+    if (this._onMapMoveForDownload) {
+      this.map.off('move', this._onMapMoveForDownload);
+      this._onMapMoveForDownload = null;
+    }
+    if (this.offlineDownloadCircle) {
+      this.map.removeLayer(this.offlineDownloadCircle);
+      this.offlineDownloadCircle = null;
+    }
+  },
+
+  /**
+   * Draws persistent dashed green circles around completed offline areas.
+   */
+  drawCachedZones(zones) {
+    if (this.cachedZoneOverlays) {
+      this.cachedZoneOverlays.forEach(overlay => this.map.removeLayer(overlay));
+    }
+    this.cachedZoneOverlays = [];
+
+    zones.forEach(zone => {
+      const circle = L.circle([zone.lat, zone.lng], {
+        radius: zone.radiusKm * 1000,
+        color: '#10b981',
+        fillColor: '#10b981',
+        fillOpacity: 0.04,
+        weight: 1.5,
+        dashArray: '4, 4',
+        interactive: false
+      }).addTo(this.map);
+      this.cachedZoneOverlays.push(circle);
+    });
   }
 };

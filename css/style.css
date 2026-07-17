@@ -570,11 +570,15 @@ body, html {
   flex: 1;
   height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 #map {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
   z-index: 1;
 }
 
@@ -783,20 +787,36 @@ body, html {
   color: var(--text-main);
 }
 
-/* Settings Modal */
+/* Settings Modal & General Modals */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  transition: opacity 0.25s ease-out;
+}
+
+@keyframes modal-scale-up {
+  0% { transform: scale(0.96) translateY(8px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.modal-overlay:not(.hidden) .modal-card {
+  animation: modal-scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#elevation-profile-canvas {
+  cursor: ew-resize;
+  touch-action: none;
 }
 
 .modal-card {
@@ -1404,6 +1424,43 @@ input[type="checkbox"]:checked::after {
   color: var(--text-main);
 }
 
+#floating-search-bar .search-icon-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+
+#floating-search-bar .search-icon-left svg {
+  width: 20px;
+  height: 20px;
+}
+
+#floating-search-bar .user-circle-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  color: var(--text-main) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  margin-right: -4px;
+}
+
+#floating-search-bar .user-circle-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  transform: scale(1.05);
+}
+
 /* Autocomplete search results box positioned below search bar */
 #floating-search-bar .search-results-box {
   position: absolute;
@@ -1648,15 +1705,15 @@ input[type="checkbox"]:checked::after {
   -webkit-backdrop-filter: blur(10px) saturate(180%);
   border: 1px solid var(--color-border);
   color: var(--text-main);
-  padding: 10px 18px;
+  padding: 6px 12px;
   border-radius: 30px;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
 }
@@ -1828,4 +1885,106 @@ input[type="checkbox"]:checked::after {
     bottom: 80px;
     width: auto;
   }
+}
+
+/* Landscape Blocker for mobile */
+#orientation-blocker {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 18, 18, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-main);
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+#orientation-blocker .animate-rotate {
+  animation: rotate-device 2.4s infinite ease-in-out;
+}
+
+@keyframes rotate-device {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-90deg);
+  }
+}
+
+@media screen and (orientation: landscape) and (max-height: 520px) {
+  #orientation-blocker {
+    display: flex;
+  }
+}
+
+/* Offline Maps Downloader CSS */
+#offline-download-panel {
+  position: absolute;
+  top: 76px;
+  right: 16px;
+  width: 280px;
+  padding: 16px;
+  border-radius: 16px;
+  z-index: 1080;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s ease-out;
+}
+
+.offline-download-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px;
+}
+
+@media (max-width: 900px) {
+  #offline-download-panel {
+    top: 76px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+
+/* Weather window tips card styling */
+.weather-tip-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.weather-tip-card svg {
+  color: var(--color-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.weather-tip-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+
+.weather-tip-desc {
+  font-size: 0.78rem;
+  color: var(--text-dimmed);
+  line-height: 1.35;
 }

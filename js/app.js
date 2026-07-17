@@ -10,6 +10,14 @@ import { GPX } from './gpx.js';
 import { Geolocation } from './geolocation.js';
 import { POI } from './poi.js';
 import { Overpass } from './overpass.js';
+import { OpfsTileStore } from './opfs-tile-store.js';
+
+// Lock screen orientation to portrait if supported
+if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+  window.screen.orientation.lock('portrait').catch(err => {
+    console.warn('Screen orientation lock failed/unsupported:', err);
+  });
+}
 
 // Application State
 const State = {
@@ -33,13 +41,40 @@ const State = {
   longPressTriggered: false,
   overpassLayerGroup: null,
   overpassRoutes: [], // Array of loaded Overpass route objects
-  compassMode: false  // true = map rotates with device compass
+  compassMode: false, // true = map rotates with device compass
+  lastSpokenStepIndex: -1,
+  stepNearAnnounced: false,
+  oledSaveModeActive: false,
+  autoReRoutingEnabled: false
 };
 
 // DOM Elements
 const DOM = {
   // Offline badging
   offlineBadges: [document.getElementById('offline-badge'), document.getElementById('desktop-offline-badge')],
+  pwaOfflineStatus: document.getElementById('pwa-offline-status'),
+  pwaOfflineText: document.getElementById('pwa-offline-text'),
+  magicOfflineIndicator: document.getElementById('magic-offline-indicator'),
+  magicOfflineText: document.getElementById('magic-offline-text'),
+  
+  // Offline Downloader
+  offlineDownloadPanel: document.getElementById('offline-download-panel'),
+  closeOfflineDownloadBtn: document.getElementById('close-offline-download-btn'),
+  startTileDownloadBtn: document.getElementById('start-tile-download-btn'),
+  
+  // OLED Screen
+  oledSaveScreen: document.getElementById('oled-save-screen'),
+  toggleOledSaveBtn: document.getElementById('toggle-oled-save-btn'),
+  exitOledBtn: document.getElementById('exit-oled-btn'),
+  oledTurnIcon: document.getElementById('oled-turn-icon'),
+  oledTurnDist: document.getElementById('oled-turn-dist'),
+  oledTurnText: document.getElementById('oled-turn-text'),
+  oledVectorSvg: document.getElementById('oled-vector-svg'),
+  oledCompassNeedle: document.getElementById('oled-compass-needle'),
+  oledCompassText: document.getElementById('oled-compass-text'),
+  oledTimeLeft: document.getElementById('oled-time-left'),
+  oledDistLeft: document.getElementById('oled-dist-left'),
+  oledElevationLeft: document.getElementById('oled-elevation-left'),
   
   // API warning card
   apiWarningCard: document.getElementById('api-key-warning'),
@@ -57,6 +92,8 @@ const DOM = {
   calculateBtn: document.getElementById('calculate-route-btn'),
   clearBtn: document.getElementById('clear-route-btn'),
   exportGpxBtn: document.getElementById('export-gpx-btn'),
+  shareTripBtn: document.getElementById('share-trip-btn'),
+  tripCardCanvas: document.getElementById('trip-card-canvas'),
   importGpxBtn: document.getElementById('import-gpx-btn'),
   gpxFileInput: document.getElementById('gpx-file-input'),
   gpsTrackBtn: document.getElementById('gps-track-btn'),
@@ -74,6 +111,7 @@ const DOM = {
   closeModalBtn: document.getElementById('close-modal-btn'),
   saveSettingsBtn: document.getElementById('save-settings-btn'),
   routingEngineSelect: document.getElementById('routing-engine-select'),
+  autoRerouteCheckbox: document.getElementById('auto-reroute-checkbox'),
   cacheSizeLabel: document.getElementById('cache-size-label'),
   clearCacheBtn: document.getElementById('clear-cache-btn'),
   
@@ -105,7 +143,7 @@ const DOM = {
   
   // Floating Search Bar & Undo Button
   floatingSearchBar: document.getElementById('floating-search-bar'),
-  hamburgerMenuBtn: document.getElementById('hamburger-menu-btn'),
+  userMenuBtn: document.getElementById('user-menu-btn'),
   searchBarInput: document.getElementById('search-bar-input'),
   searchBarResults: document.getElementById('search-bar-results'),
   mapUndoBtn: document.getElementById('map-undo-btn'),
@@ -157,14 +195,10 @@ const DOM = {
   settingsCyclerouteSelect: document.getElementById('settings-cycleroute-select'),
   settingsToggleProposedCycleways: document.getElementById('settings-toggle-proposed-cycleways'),
   settingsToggleTunnel: document.getElementById('settings-toggle-tunnel'),
-  settingsToggleBeeline: document.getElementById('settings-toggle-beeline'),
   settingsSliderUphill: document.getElementById('settings-slider-uphill'),
   settingsSliderDownhill: document.getElementById('settings-slider-downhill'),
 
-  // Map Stats Ticker
-  mapStatsTicker: document.getElementById('map-stats-ticker'),
-  tickerDistVal: document.getElementById('ticker-dist-val'),
-  tickerElevVal: document.getElementById('ticker-elev-val'),
+
 
   // MagicTrack AI Modal
   magicTrackBtn: document.getElementById('magic-track-btn'),
@@ -234,6 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
   updateOnlineStatus();
   window.addEventListener('online', updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
+
+  // Initialize offline map tile downloader
+  initOfflineMaps();
 });
 
 // Update UI depending on connectivity
@@ -248,6 +285,27 @@ function updateOnlineStatus() {
       }
     }
   });
+
+  // Update PWA Offline Status Badges
+  if (DOM.pwaOfflineStatus) {
+    const dot = DOM.pwaOfflineStatus.querySelector('.status-dot');
+    if (dot) {
+      dot.style.backgroundColor = isOnline ? '#10b981' : '#f59e0b';
+    }
+    if (DOM.pwaOfflineText) {
+      DOM.pwaOfflineText.textContent = isOnline ? 'Vialo offline bereit' : 'Offline-Modus aktiv (Karten aus Cache)';
+    }
+  }
+
+  if (DOM.magicOfflineIndicator) {
+    const dot = DOM.magicOfflineIndicator.querySelector('.status-dot');
+    if (dot) {
+      dot.style.backgroundColor = isOnline ? '#10b981' : '#f59e0b';
+    }
+    if (DOM.magicOfflineText) {
+      DOM.magicOfflineText.textContent = isOnline ? 'Magic Track offline bereit' : 'Magic Track offline bereit (Cache)';
+    }
+  }
 }
 
 function syncBRouterCheckboxes() {
@@ -327,7 +385,6 @@ function syncBRouterCheckboxes() {
   if (DOM.settingsToggleOneway) DOM.settingsToggleOneway.checked = !!getOpt('ignore_oneway', false);
   if (DOM.settingsToggleProposedCycleways) DOM.settingsToggleProposedCycleways.checked = !!getOpt('use_proposed_cycleroutes', false);
   if (DOM.settingsToggleTunnel) DOM.settingsToggleTunnel.checked = !!getOpt('avoid_tunnel', false);
-  if (DOM.settingsToggleBeeline) DOM.settingsToggleBeeline.checked = !!getOpt('add_beeline', false);
 
   // Sliders Level 3 Tuning
   const uphillVal = getOpt('uphillcost', 0);
@@ -400,6 +457,7 @@ function loadSettings() {
   State.routingEngine = Storage.getRoutingEngine();
   State.apiKey = Storage.getApiKey();
   State.brouterOptions = Storage.getBRouterOptions();
+  State.brouterOptions.add_beeline = false; // Always enforce no beeline straight connections!
 
   if (DOM.routingEngineSelect) {
     DOM.routingEngineSelect.value = State.routingEngine;
@@ -422,6 +480,13 @@ function loadSettings() {
 
   updateActivityUI(State.activeProfile);
   syncBRouterCheckboxes();
+
+  // Restore auto reroute settings preference
+  const savedAutoReroute = localStorage.getItem('auto_re_routing') === 'true';
+  State.autoReRoutingEnabled = savedAutoReroute;
+  if (DOM.autoRerouteCheckbox) {
+    DOM.autoRerouteCheckbox.checked = savedAutoReroute;
+  }
 
   // Restore active map layer preference
   const savedLayer = localStorage.getItem('active_map_layer');
@@ -467,21 +532,11 @@ function loadSettings() {
 
 function setupEventListeners() {
   // Sidebar Toggles
-  if (DOM.hamburgerMenuBtn) {
-    DOM.hamburgerMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
+  if (DOM.userMenuBtn) {
+    DOM.userMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
   }
   if (DOM.closeSidebarBtn) {
     DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
-  }
-
-
-
-  // Offline Karten Button in Sidebar
-  if (DOM.offlineMapsBtn) {
-    DOM.offlineMapsBtn.addEventListener('click', () => {
-      alert('Offline-Karten aktiv: Der Cache speichert alle angezeigten Kartenabschnitte automatisch im Hintergrund.');
-      DOM.sidebar.classList.remove('open');
-    });
   }
 
   // Settings Modal
@@ -497,6 +552,10 @@ function setupEventListeners() {
       const engine = DOM.routingEngineSelect.value;
       const offlineCheckbox = document.getElementById('offline-tiles-checkbox');
       const offline = offlineCheckbox ? offlineCheckbox.checked : true;
+
+      const autoReroute = DOM.autoRerouteCheckbox ? DOM.autoRerouteCheckbox.checked : false;
+      localStorage.setItem('auto_re_routing', autoReroute);
+      State.autoReRoutingEnabled = autoReroute;
       
       Storage.saveRoutingEngine(engine);
       
@@ -708,8 +767,7 @@ function setupEventListeners() {
     { el: DOM.settingsToggleTraffic, key: 'consider_traffic' },
     { el: DOM.settingsToggleOneway, key: 'ignore_oneway' },
     { el: DOM.settingsToggleProposedCycleways, key: 'use_proposed_cycleroutes' },
-    { el: DOM.settingsToggleTunnel, key: 'avoid_tunnel' },
-    { el: DOM.settingsToggleBeeline, key: 'add_beeline' }
+    { el: DOM.settingsToggleTunnel, key: 'avoid_tunnel' }
   ];
 
   optionMappings.forEach(m => {
@@ -1039,8 +1097,11 @@ function setupEventListeners() {
   DOM.calculateBtn.addEventListener('click', calculateAndDisplayRoute);
   DOM.clearBtn.addEventListener('click', clearRoute);
 
-  // GPX Handling
+  // GPX Handling & Sharing
   DOM.exportGpxBtn.addEventListener('click', exportGPXRoute);
+  if (DOM.shareTripBtn) {
+    DOM.shareTripBtn.addEventListener('click', generateAndShareTripCard);
+  }
   DOM.importGpxBtn.addEventListener('click', () => DOM.gpxFileInput.click());
   DOM.gpxFileInput.addEventListener('change', importGPXRoute);
 
@@ -1099,6 +1160,12 @@ function setupEventListeners() {
   // Navigation start/stop
   DOM.sheetActionBtn.addEventListener('click', toggleNavigation);
   DOM.stopNavBtn.addEventListener('click', stopNavigation);
+  if (DOM.toggleOledSaveBtn) {
+    DOM.toggleOledSaveBtn.addEventListener('click', () => toggleOledSaveMode(true));
+  }
+  if (DOM.exitOledBtn) {
+    DOM.exitOledBtn.addEventListener('click', () => toggleOledSaveMode(false));
+  }
   DOM.gpsTrackBtn.addEventListener('click', toggleGPSTracking);
   // Overpass Route Search Action Event Listeners
   const updateSearchBtnState = () => {
@@ -1518,6 +1585,75 @@ function selectOverpassRoute(index, zoomTo = false) {
   if (zoomTo) {
     MapController.map.fitBounds(route.polyline.getBounds());
   }
+
+  // Load the clicked Overpass route into the active routing/navigation state
+  const flatCoords = [];
+  route.geometry.forEach(path => {
+    path.forEach(pt => {
+      // Convert [lat, lon] to [lon, lat, 0] for the app's routing State
+      flatCoords.push([pt[1], pt[0], 0]);
+    });
+  });
+
+  if (flatCoords.length > 1) {
+    const startCoord = flatCoords[0];
+    const endCoord = flatCoords[flatCoords.length - 1];
+
+    State.routePoints = [
+      { name: route.name + ' (Start)', lat: startCoord[1], lon: startCoord[0] },
+      { name: route.name + ' (Ziel)', lat: endCoord[1], lon: endCoord[0] }
+    ];
+
+    updateSearchInputsFromPoints();
+    renderRoutePoints();
+
+    // Calculate total distance of this track
+    let totalDist = 0;
+    for (let i = 0; i < flatCoords.length - 1; i++) {
+      totalDist += Geolocation.calculateDistance(
+        flatCoords[i][1], flatCoords[i][0],
+        flatCoords[i+1][1], flatCoords[i+1][0]
+      );
+    }
+
+    const geojson = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: flatCoords
+      },
+      properties: {
+        name: route.name
+      }
+    };
+
+    State.calculatedRoute = {
+      geojson: geojson,
+      stats: {
+        distance: totalDist / 1000,
+        duration: totalDist / (route.type === 'Fahrrad' ? 4.16 : 1.11), // 15 km/h vs 4 km/h
+        elevationGain: 0,
+        elevationLoss: 0
+      },
+      coordinates: flatCoords,
+      steps: [{ instruction: 'Folge der Route: ' + route.name, distance: totalDist, way_points: [0, flatCoords.length - 1] }],
+      surfaces: [{ name: 'Straße/Weg', pct: 100, color: '#ABC1AD' }]
+    };
+
+    // Set active profile based on route type (Fahrrad -> cycling-regular, Wandern -> foot-hiking)
+    const newProfile = route.type === 'Fahrrad' ? 'cycling-regular' : 'foot-hiking';
+    if (State.activeProfile !== newProfile) {
+      State.activeProfile = newProfile;
+      updateActivityUI(newProfile);
+    }
+
+    // Draw active route on the map
+    MapController.drawRoute(geojson);
+
+    // Update UI panels, bottom sheet details, and elevation profile
+    updateRouteUI(State.calculatedRoute);
+    saveRouteToHistory(State.calculatedRoute);
+  }
 }
 
 
@@ -1647,6 +1783,9 @@ function updateRouteUI(route) {
 
   // Render elevation profile on canvas
   drawElevationProfile(route.coordinates);
+
+  // Fetch and draw route weather forecast info
+  fetchRouteWeatherForecast(route);
 
   // Render Turn-by-Turn directions list
   renderNavigationInstructions(route.steps);
@@ -1790,6 +1929,202 @@ function exportGPXRoute() {
   const a = document.createElement('a');
   a.href = url;
   a.download = `vialo_route_${Date.now()}.gpx`;
+  document.body.appendChild(a);
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Generates a beautiful shareable Trip Card Image using Canvas API
+ */
+function generateAndShareTripCard() {
+  if (!State.calculatedRoute || State.routePoints.length === 0) {
+    alert('Keine Route zum Teilen vorhanden.');
+    return;
+  }
+
+  const canvas = DOM.tripCardCanvas;
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Set card dimensions
+  canvas.width = 800;
+  canvas.height = 500;
+
+  // 1. Background Fill (Dark Theme)
+  const grad = ctx.createLinearGradient(0, 0, 0, 500);
+  grad.addColorStop(0, '#161816');
+  grad.addColorStop(1, '#222522');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 800, 500);
+
+  // 2. Draw Card Border/Shadow Container
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(20, 20, 760, 460, 16);
+  else ctx.rect(20, 20, 760, 460);
+  ctx.fill();
+  ctx.stroke();
+
+  // 3. Draw Brand & Logo
+  ctx.fillStyle = '#ABC1AD'; // Brand Primary
+  ctx.font = 'bold 24px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
+  ctx.fillText('Vialo', 44, 60);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.font = '14px system-ui, sans-serif';
+  ctx.fillText('DEINE OUTDOOR TOUR', 44, 85);
+
+  // Route Title
+  const startName = State.routePoints[0].name.split(',')[0].trim();
+  const destName = State.routePoints[State.routePoints.length - 1].name.split(',')[0].trim();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 28px system-ui, sans-serif';
+  ctx.fillText(`${startName} → ${destName}`, 44, 130);
+
+  // Stats blocks
+  const dist = State.calculatedRoute.stats.distance.toFixed(1) + ' km';
+  const hours = Math.floor(State.calculatedRoute.stats.duration / 3600);
+  const mins = Math.floor((State.calculatedRoute.stats.duration % 3600) / 60);
+  const dur = `${hours > 0 ? hours + ' Std ' : ''}${mins} Min`;
+  const gain = `+${State.calculatedRoute.stats.elevationGain} m`;
+  const profile = State.activeProfile === 'foot-hiking' ? 'Wandern' : 'Fahrrad';
+
+  const stats = [
+    { label: 'DISTANZ', value: dist },
+    { label: 'DAUER', value: dur },
+    { label: 'ANSTIEG', value: gain },
+    { label: 'PROFIL', value: profile }
+  ];
+
+  stats.forEach((st, idx) => {
+    const y = 180 + idx * 68;
+    // Bullet/indicator
+    ctx.fillStyle = '#FC5200'; // Orange Strava indicator
+    ctx.beginPath();
+    ctx.arc(48, y + 18, 4, 0, 2 * Math.PI);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillText(st.label, 64, y + 12);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText(st.value, 64, y + 34);
+  });
+
+  // 4. Draw Route Geometry Preview on the right side
+  const coords = State.calculatedRoute.coordinates;
+  if (coords && coords.length > 0) {
+    const drawW = 340;
+    const drawH = 340;
+    const drawX = 400;
+    const drawY = 80;
+
+    // Draw Map Frame Box
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(drawX, drawY, drawW, drawH, 12);
+    else ctx.rect(drawX, drawY, drawW, drawH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Map bounds of coordinates
+    let minLon = Infinity, maxLon = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+
+    coords.forEach(c => {
+      if (c[0] < minLon) minLon = c[0];
+      if (c[0] > maxLon) maxLon = c[0];
+      if (c[1] < minLat) minLat = c[1];
+      if (c[1] > maxLat) maxLat = c[1];
+    });
+
+    const lonSpan = maxLon - minLon;
+    const latSpan = maxLat - minLat;
+    const maxSpan = Math.max(lonSpan, latSpan) || 0.0001;
+
+    // Scale coords to fit centered inside the drawing box (padding = 30px)
+    const pad = 30;
+    const scale = (drawW - pad * 2) / maxSpan;
+
+    const getPixelCoords = (lon, lat) => {
+      const offsetX = (lon - minLon) * scale;
+      const offsetY = (maxLat - lat) * scale; // invert Y since canvas counts down
+
+      // Centering offsets
+      const dx = (drawW - lonSpan * scale) / 2;
+      const dy = (drawH - latSpan * scale) / 2;
+
+      return {
+        x: drawX + dx + offsetX,
+        y: drawY + dy + offsetY
+      };
+    };
+
+    // Draw route line
+    ctx.strokeStyle = '#FC5200';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+
+    coords.forEach((c, idx) => {
+      const { x, y } = getPixelCoords(c[0], c[1]);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Draw Start (Green) & End (Red) dots
+    const startPixel = getPixelCoords(coords[0][0], coords[0][1]);
+    ctx.fillStyle = '#8DB600';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(startPixel.x, startPixel.y, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    const endPixel = getPixelCoords(coords[coords.length - 1][0], coords[coords.length - 1][1]);
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(endPixel.x, endPixel.y, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 5. Trigger Native Share API or direct image download
+  canvas.toBlob(blob => {
+    if (!blob) return;
+    const file = new File([blob], `vialo_tour_${Date.now()}.png`, { type: 'image/png' });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        files: [file],
+        title: 'Vialo Tour',
+        text: `Schau dir meine geplante Tour an! ${dist} in ${dur}.`
+      }).catch(err => {
+        console.warn('Native share failed, downloading instead:', err);
+        downloadBlob(blob);
+      });
+    } else {
+      downloadBlob(blob);
+    }
+  }, 'image/png');
+}
+
+function downloadBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vialo_tripcard_${Date.now()}.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2030,8 +2365,9 @@ function toggleGPSTracking() {
  */
 function setupGeolocation() {
   Geolocation.onLocationUpdate((pos) => {
+    State.lastUserPosition = pos;
     // 1. Draw dot and accuracy circle
-    MapController.updateUserPosition(pos, State.isNavigating, State.activeProfile); // Center map if in Navigation mode
+    MapController.updateUserPosition(pos, State.isNavigating && !State.oledSaveModeActive, State.activeProfile); // Center map if in Navigation mode (and not in OLED save mode)
 
     // 2. If in active Navigation Mode, update instructions
     if (State.isNavigating && State.calculatedRoute) {
@@ -2040,12 +2376,32 @@ function setupGeolocation() {
   });
 
   Geolocation.onHeadingUpdate((heading) => {
+    State.currentBearing = heading;
     MapController.updateUserHeading(heading);
     // Rotate the map when compass mode is active
-    if (State.compassMode) {
+    if (State.compassMode && !State.oledSaveModeActive) {
       MapController.setMapRotation(heading);
     }
+    // Update OLED compass needle in real time
+    if (State.isNavigating && State.oledSaveModeActive && State.lastUserPosition) {
+      updateNavigationLogic(State.lastUserPosition);
+    }
   });
+}
+
+/**
+ * Speech Synthesis TTS helper
+ */
+let lastSpokenText = '';
+function speakInstruction(text) {
+  if ('speechSynthesis' in window && text !== lastSpokenText) {
+    window.speechSynthesis.cancel(); // cancel any active speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'de-DE';
+    utterance.rate = 1.05;
+    window.speechSynthesis.speak(utterance);
+    lastSpokenText = text;
+  }
 }
 
 /**
@@ -2069,33 +2425,65 @@ function updateNavigationLogic(userPos) {
     }
   }
 
-  // Check if off route (e.g. user is more than 60m away from the path)
-  if (minDistance > 60) {
+  // Check if off route (> 40 meters)
+  if (minDistance > 40) {
     DOM.navDist.textContent = 'Off-Route';
-    DOM.navText.textContent = 'Bitte kehre auf den geplanten Weg zurück.';
     DOM.navIcon.setAttribute('data-lucide', 'alert-circle');
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    if (State.autoReRoutingEnabled) {
+      DOM.navText.textContent = 'Berechne Ausweichroute...';
+      
+      // Calculate target coordinate (~800m ahead on the original path)
+      let accumulatedDist = 0;
+      let targetIndex = closestIndex;
+      while (targetIndex < coords.length - 1 && accumulatedDist < 800) {
+        accumulatedDist += Geolocation.calculateDistance(
+          coords[targetIndex][1], coords[targetIndex][0],
+          coords[targetIndex + 1][1], coords[targetIndex + 1][0]
+        );
+        targetIndex++;
+      }
+
+      if (targetIndex > closestIndex && !isReRouting) {
+        triggerBackgroundReRoute(userPos, closestIndex, targetIndex);
+      }
+    } else {
+      DOM.navText.textContent = 'Bitte kehre auf den geplanten Weg zurück.';
+      if (State.lastSpokenStepIndex !== -3) {
+        speakInstruction("Du bist vom Weg abgekommen. Bitte kehre auf die Route zurück.");
+        State.lastSpokenStepIndex = -3;
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      }
+    }
     return;
   }
 
   // 2. Match coordinate index with routing steps
-  // ORS steps contain waypoint indices: step.way_points = [startIndex, endIndex]
   let currentStep = null;
   let nextStep = null;
+  let currentStepIndex = -1;
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     if (closestIndex >= step.way_points[0] && closestIndex <= step.way_points[1]) {
       currentStep = step;
       nextStep = steps[i + 1] || null;
+      currentStepIndex = i;
       break;
     }
   }
 
   if (currentStep) {
+    // 3. New step initial voice announcement
+    if (State.lastSpokenStepIndex !== currentStepIndex) {
+      State.lastSpokenStepIndex = currentStepIndex;
+      State.stepNearAnnounced = false;
+      speakInstruction(currentStep.instruction);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
     // Calculate distance to the next step point
-    let distanceToNextText = '';
-    
     if (nextStep) {
       const nextStepStartCoord = coords[nextStep.way_points[0]];
       const distToNext = Geolocation.calculateDistance(
@@ -2103,7 +2491,7 @@ function updateNavigationLogic(userPos) {
         nextStepStartCoord[1], nextStepStartCoord[0]
       );
       
-      distanceToNextText = distToNext > 1000 
+      const distanceToNextText = distToNext > 1000 
         ? `In ${(distToNext / 1000).toFixed(1)} km` 
         : `In ${Math.round(distToNext)} m`;
 
@@ -2113,11 +2501,34 @@ function updateNavigationLogic(userPos) {
       // Determine Direction Icon
       const iconName = getNavigationIcon(currentStep.type);
       DOM.navIcon.setAttribute('data-lucide', iconName);
+
+      // 4. Near-turn speech alert & haptic double-pulse (within 40 meters)
+      if (distToNext <= 40 && !State.stepNearAnnounced) {
+        State.stepNearAnnounced = true;
+        speakInstruction(`Jetzt: ${nextStep.instruction}`);
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      }
     } else {
       DOM.navDist.textContent = 'Ziel erreicht';
       DOM.navText.textContent = 'Du hast dein Ziel erreicht.';
       DOM.navIcon.setAttribute('data-lucide', 'check-circle');
+      
+      if (State.lastSpokenStepIndex !== -2) {
+        speakInstruction("Du hast dein Ziel erreicht. Navigation beendet.");
+        if (navigator.vibrate) navigator.vibrate([150, 100, 150, 100, 200]);
+        State.lastSpokenStepIndex = -2; // lock destination spoken state
+      }
     }
+    
+    // Update OLED dashboard values if save mode is active
+    if (State.oledSaveModeActive) {
+      const nextStepStartCoord = nextStep ? coords[nextStep.way_points[0]] : null;
+      const distToNext = nextStepStartCoord 
+        ? Geolocation.calculateDistance(userPos.lat, userPos.lng, nextStepStartCoord[1], nextStepStartCoord[0])
+        : 0;
+      renderOledAkkusparmodusData(userPos, closestIndex, currentStep, nextStep, distToNext);
+    }
+
     lucide.createIcons();
   }
 }
@@ -2149,6 +2560,33 @@ function getNavigationIcon(type) {
   }
 }
 
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (err) {
+      console.warn('Wake Lock request failed:', err);
+    }
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock !== null) {
+    wakeLock.release().then(() => {
+      wakeLock = null;
+    });
+  }
+}
+
+// Re-acquire lock if tab becomes visible again
+document.addEventListener('visibilitychange', async () => {
+  if (State.isNavigating && document.visibilityState === 'visible') {
+    await requestWakeLock();
+  }
+});
+
 /**
  * Controls Starting / Stopping the GPS Tracking navigation or Simulator
  */
@@ -2167,15 +2605,34 @@ function toggleNavigation() {
     DOM.sheetActionBtn.classList.remove('btn-accent');
     DOM.sheetActionBtn.classList.add('btn-secondary');
 
+    // Keep screen awake
+    requestWakeLock();
+
     // Snug fit the bottom sheet down to collapsed view so the banner and map are fully visible
     DOM.bottomSheet.classList.remove('half-open', 'fully-open');
 
-    // Determine if we should simulate or track:
-    // If we're on a desktop browser, or the user is not moving, the Simulator is the perfect showcase.
-    // We start the simulation along the route!
     const coords = State.calculatedRoute.coordinates;
-    if (coords && coords.length > 0) {
+    const isMobile = window.innerWidth <= 900 || ('ontouchstart' in window);
+
+    if (isMobile && coords && coords.length > 0) {
+      // ── MOBILE: Real-time GPS Live Navigation ──
+      State.isTracking = true;
+      State.compassMode = true; // Auto-rotate map to look ahead
+      Geolocation.startTracking();
+      Geolocation.startHeadingTracking();
+      
+      // Update GPS button to active compass state
+      State.gpsButtonState = 2;
+      _setGpsBtnIcon('compass', true);
+
+      // Play start voice feedback and short vibration
+      speakInstruction("Navigation gestartet. Folge dem markierten Weg.");
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    } else if (coords && coords.length > 0) {
+      // ── DESKTOP: Route Simulator ──
       Geolocation.startSimulation(coords, 28); // 28 km/h cycle simulation
+      speakInstruction("Simulation gestartet.");
+      if (navigator.vibrate) navigator.vibrate(100);
     }
   }
 }
@@ -2183,10 +2640,24 @@ function toggleNavigation() {
 function stopNavigation() {
   State.isNavigating = false;
   Geolocation.stopSimulation();
+  Geolocation.stopTracking();
+  
+  State.compassMode = false;
+  State.isTracking = false;
+  State.gpsButtonState = 0;
+  _setGpsBtnIcon('locate-fixed', false);
+  MapController.setMapRotation(0);
+
+  // Release screen lock
+  releaseWakeLock();
+
   DOM.navBanner.classList.add('hidden');
   DOM.sheetActionBtn.textContent = 'Start';
   DOM.sheetActionBtn.classList.remove('btn-secondary');
   DOM.sheetActionBtn.classList.add('btn-accent');
+
+  speakInstruction("Navigation beendet.");
+  if (navigator.vibrate) navigator.vibrate(150);
 }
 
 /**
@@ -2404,9 +2875,23 @@ function registerServiceWorker() {
  * Draws a premium, smooth elevation profile onto all route canvas elements (including clones)
  * @param {Array<Array>} coordinates GPS coordinate list [lon, lat, elevation]
  */
-function drawElevationProfile(coordinates) {
+function drawElevationProfile(coordinates, retryCount = 0) {
   const canvases = document.querySelectorAll('#elevation-profile-canvas');
   if (canvases.length === 0) return;
+
+  // Check if any canvas is currently hidden (0 dimensions) and retry when visible
+  let needsRetry = false;
+  canvases.forEach(canvas => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      needsRetry = true;
+    }
+  });
+
+  if (needsRetry && retryCount < 10) {
+    setTimeout(() => drawElevationProfile(coordinates, retryCount + 1), 150);
+    return;
+  }
 
   // Filter coordinates with valid elevation (index 2)
   const data = coordinates
@@ -2420,14 +2905,14 @@ function drawElevationProfile(coordinates) {
 
   // Compute cumulative distance along the path for the X axis
   let cumulativeDist = 0;
-  const dataPoints = [{ dist: 0, ele: data[0].ele }];
+  const dataPoints = [{ dist: 0, ele: data[0].ele, lat: data[0].lat, lon: data[0].lon }];
   
   for (let i = 1; i < data.length; i++) {
     const c1 = data[i-1];
     const c2 = data[i];
     const d = Routing.calculateHaversine(c1.lat, c1.lon, c2.lat, c2.lon);
     cumulativeDist += d / 1000; // in km
-    dataPoints.push({ dist: cumulativeDist, ele: c2.ele });
+    dataPoints.push({ dist: cumulativeDist, ele: c2.ele, lat: c2.lat, lon: c2.lon });
   }
 
   const maxDist = cumulativeDist;
@@ -2436,101 +2921,243 @@ function drawElevationProfile(coordinates) {
   const maxEle = Math.max(...elevations);
   const eleRange = maxEle - minEle;
 
-  // Render on all active canvas instances (original desktop + cloned mobile bottom sheet)
   canvases.forEach(canvas => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Reset dimensions to match display size for crisp rendering on high-DPI screens
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    let lastScrubIdx = -1;
 
-    const w = rect.width;
-    const h = rect.height;
+    function render(hoverIdx = -1) {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    ctx.clearRect(0, 0, w, h);
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
 
-    // Padding
-    const paddingLeft = 32;
-    const paddingRight = 10;
-    const paddingTop = 12;
-    const paddingBottom = 18;
+      const paddingLeft = 32;
+      const paddingRight = 10;
+      const paddingTop = 12;
+      const paddingBottom = 18;
 
-    const chartW = w - paddingLeft - paddingRight;
-    const chartH = h - paddingTop - paddingBottom;
+      const chartW = w - paddingLeft - paddingRight;
+      const chartH = h - paddingTop - paddingBottom;
 
-    // Draw horizontal grid lines (elevation)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
+      // Draw horizontal grid lines (elevation)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
 
-    const gridCount = 3;
-    for (let i = 0; i <= gridCount; i++) {
-      const val = minEle + (eleRange * (i / gridCount));
-      const y = paddingTop + chartH - (chartH * (i / gridCount));
-      
+      const gridCount = 3;
+      for (let i = 0; i <= gridCount; i++) {
+        const val = minEle + (eleRange * (i / gridCount));
+        const y = paddingTop + chartH - (chartH * (i / gridCount));
+        
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(w - paddingRight, y);
+        ctx.stroke();
+
+        ctx.fillText(Math.round(val) + 'm', paddingLeft - 6, y);
+      }
+
+      // Draw vertical grid lines (distance labels in km)
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const distGridCount = 4;
+      for (let i = 0; i <= distGridCount; i++) {
+        const val = (maxDist * (i / distGridCount));
+        const x = paddingLeft + (chartW * (i / distGridCount));
+
+        ctx.beginPath();
+        ctx.moveTo(x, paddingTop);
+        ctx.lineTo(x, paddingTop + chartH);
+        ctx.stroke();
+
+        ctx.fillText(val.toFixed(1) + ' km', x, paddingTop + chartH + 4);
+      }
+
+      // Area Gradient Fill
       ctx.beginPath();
-      ctx.moveTo(paddingLeft, y);
-      ctx.lineTo(w - paddingRight, y);
+      ctx.moveTo(paddingLeft, paddingTop + chartH);
+
+      dataPoints.forEach(pt => {
+        const x = paddingLeft + (chartW * (pt.dist / (maxDist || 1)));
+        const yNorm = eleRange > 0 ? (pt.ele - minEle) / eleRange : 0.5;
+        const y = paddingTop + chartH - (chartH * yNorm);
+        ctx.lineTo(x, y);
+      });
+
+      ctx.lineTo(paddingLeft + chartW, paddingTop + chartH);
+      ctx.closePath();
+
+      const areaGrad = ctx.createLinearGradient(0, paddingTop, 0, paddingTop + chartH);
+      areaGrad.addColorStop(0, 'rgba(171, 193, 173, 0.35)'); // Primary color matching (#ABC1AD)
+      areaGrad.addColorStop(1, 'rgba(171, 193, 173, 0.00)');
+      ctx.fillStyle = areaGrad;
+      ctx.fill();
+
+      // Spline/Path Line
+      ctx.beginPath();
+      dataPoints.forEach((pt, idx) => {
+        const x = paddingLeft + (chartW * (pt.dist / (maxDist || 1)));
+        const yNorm = eleRange > 0 ? (pt.ele - minEle) / eleRange : 0.5;
+        const y = paddingTop + chartH - (chartH * yNorm);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.strokeStyle = '#ABC1AD'; // Primary color matching
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillText(Math.round(val) + 'm', paddingLeft - 6, y);
+      // Draw weather overlays on the chart
+      if (State.routeWeatherForecast && State.routeWeatherForecast.length > 0) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+
+        State.routeWeatherForecast.forEach(f => {
+          const distKm = f.distMeters / 1000;
+          const x = paddingLeft + (chartW * (distKm / (maxDist || 1)));
+          
+          // Draw a small dashed vertical line down to the profile
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(x, paddingTop + 2);
+          ctx.lineTo(x, paddingTop + chartH);
+          ctx.stroke();
+          ctx.setLineDash([]); // restore solid lines
+
+          // Get weather emoji symbol
+          let emoji = '☀️';
+          if (f.code >= 1 && f.code <= 3) emoji = '☁️';
+          else if (f.code >= 45 && f.code <= 48) emoji = '🌫️';
+          else if ((f.code >= 51 && f.code <= 67) || (f.code >= 80 && f.code <= 82)) emoji = '🌧️';
+          else if (f.code >= 71 && f.code <= 86) emoji = '❄️';
+          else if (f.code >= 95) emoji = '⛈️';
+
+          // Draw emoji slightly offset from the top
+          ctx.font = '11px sans-serif';
+          ctx.fillText(emoji, x, paddingTop + 8);
+          
+          // Draw temperature text below emoji
+          ctx.font = 'bold 8px sans-serif';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.fillText(`${Math.round(f.temp)}°`, x, paddingTop + 20);
+        });
+      }
+
+      // Draw vertical indicator line & tooltip on hover/scrub
+      if (hoverIdx >= 0 && hoverIdx < dataPoints.length) {
+        const pt = dataPoints[hoverIdx];
+        const x = paddingLeft + (chartW * (pt.dist / (maxDist || 1)));
+        const yNorm = eleRange > 0 ? (pt.ele - minEle) / eleRange : 0.5;
+        const y = paddingTop + chartH - (chartH * yNorm);
+
+        // Vertical Guide line
+        ctx.strokeStyle = 'var(--color-primary)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, paddingTop);
+        ctx.lineTo(x, paddingTop + chartH);
+        ctx.stroke();
+
+        // Guide dot on spline
+        ctx.fillStyle = 'var(--color-primary)';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        // Render Tooltip Box on Canvas
+        const tooltipText = `${pt.dist.toFixed(1)} km | ${Math.round(pt.ele)} m`;
+        ctx.font = 'bold 9px sans-serif';
+        const textWidth = ctx.measureText(tooltipText).width;
+        const boxW = textWidth + 12;
+        const boxH = 18;
+        let boxX = x - boxW / 2;
+        let boxY = y - boxH - 8;
+
+        // Constraint checking inside canvas bounds
+        if (boxX < paddingLeft) boxX = paddingLeft;
+        if (boxX + boxW > w - paddingRight) boxX = w - paddingRight - boxW;
+        if (boxY < paddingTop) boxY = y + 8; // flip below dot if too high
+
+        ctx.fillStyle = 'rgba(18, 18, 18, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 4);
+        else ctx.rect(boxX, boxY, boxW, boxH);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tooltipText, boxX + boxW / 2, boxY + boxH / 2);
+      }
     }
 
-    // Draw vertical grid lines (distance labels in km)
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const distGridCount = 4;
-    for (let i = 0; i <= distGridCount; i++) {
-      const val = (maxDist * (i / distGridCount));
-      const x = paddingLeft + (chartW * (i / distGridCount));
+    // Draw initially
+    render(-1);
 
-      ctx.beginPath();
-      ctx.moveTo(x, paddingTop);
-      ctx.lineTo(x, paddingTop + chartH);
-      ctx.stroke();
+    // Mouse and Touch Interaction
+    function handleScrub(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const x = clientX - rect.left;
 
-      ctx.fillText(val.toFixed(1) + ' km', x, paddingTop + chartH + 4);
+      const paddingLeft = 32;
+      const paddingRight = 10;
+      const chartW = rect.width - paddingLeft - paddingRight;
+
+      const ratio = Math.max(0, Math.min(1, (x - paddingLeft) / chartW));
+      const targetDist = ratio * maxDist;
+
+      // Binary search closest point
+      let closestIdx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < dataPoints.length; i++) {
+        const diff = Math.abs(dataPoints[i].dist - targetDist);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = i;
+        }
+      }
+
+      render(closestIdx);
+
+      // Draw marker on Leaflet map
+      const pt = dataPoints[closestIdx];
+      MapController.updateScrubbingMarker([pt.lat, pt.lon]);
+
+      // Subtle vibration feedback on scrubbing to new points
+      if (closestIdx !== lastScrubIdx) {
+        if (navigator.vibrate) navigator.vibrate(5);
+        lastScrubIdx = closestIdx;
+      }
     }
 
-    // Area Gradient Fill
-    ctx.beginPath();
-    ctx.moveTo(paddingLeft, paddingTop + chartH);
+    function clearScrub() {
+      render(-1);
+      MapController.clearScrubbingMarker();
+      lastScrubIdx = -1;
+    }
 
-    dataPoints.forEach(pt => {
-      const x = paddingLeft + (chartW * (pt.dist / (maxDist || 1)));
-      const yNorm = eleRange > 0 ? (pt.ele - minEle) / eleRange : 0.5;
-      const y = paddingTop + chartH - (chartH * yNorm);
-      ctx.lineTo(x, y);
-    });
-
-    ctx.lineTo(paddingLeft + chartW, paddingTop + chartH);
-    ctx.closePath();
-
-    const areaGrad = ctx.createLinearGradient(0, paddingTop, 0, paddingTop + chartH);
-    areaGrad.addColorStop(0, 'rgba(171, 193, 173, 0.35)'); // Primary color matching (#ABC1AD)
-    areaGrad.addColorStop(1, 'rgba(171, 193, 173, 0.00)');
-    ctx.fillStyle = areaGrad;
-    ctx.fill();
-
-    // Spline/Path Line
-    ctx.beginPath();
-    dataPoints.forEach((pt, idx) => {
-      const x = paddingLeft + (chartW * (pt.dist / (maxDist || 1)));
-      const yNorm = eleRange > 0 ? (pt.ele - minEle) / eleRange : 0.5;
-      const y = paddingTop + chartH - (chartH * yNorm);
-      if (idx === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-
-    ctx.strokeStyle = '#ABC1AD'; // Primary color matching
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    canvas.addEventListener('mousemove', handleScrub);
+    canvas.addEventListener('touchmove', handleScrub, { passive: true });
+    canvas.addEventListener('mouseleave', clearScrub);
+    canvas.addEventListener('touchend', clearScrub);
   });
 }
 
@@ -2892,4 +3519,651 @@ function getMockRouteData(startText, activeProfile) {
       "semantic_waypoints": [startText, `Rathaus, ${city}`, `See, ${city}`, `Flussweg, ${city}`, startText]
     };
   }
+}
+
+/**
+ * Offline Maps Downloader Logic
+ */
+let isDownloadingTiles = false;
+let downloadCancelRequested = false;
+
+function initOfflineMaps() {
+  // Load and render persistent outlines for previously downloaded map regions
+  OpfsTileStore.getCachedZones().then(zones => {
+    MapController.drawCachedZones(zones);
+  });
+
+  // Bind "Offline-Karten" click inside the Sidebar
+  if (DOM.offlineMapsBtn) {
+    DOM.offlineMapsBtn.addEventListener('click', () => {
+      // Toggle sidebar closed to show the map & floating control card
+      if (DOM.sidebar) DOM.sidebar.classList.remove('open');
+      
+      // Open selector circle and download floating panel
+      if (DOM.offlineDownloadPanel) {
+        DOM.offlineDownloadPanel.classList.remove('hidden');
+        MapController.showOfflineDownloadZone();
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+    });
+  }
+
+  // Bind floating card downloader close button
+  if (DOM.closeOfflineDownloadBtn) {
+    DOM.closeOfflineDownloadBtn.addEventListener('click', () => {
+      if (DOM.offlineDownloadPanel) DOM.offlineDownloadPanel.classList.add('hidden');
+      MapController.hideOfflineDownloadZone();
+    });
+  }
+
+  // Bind floating card downloader start button
+  if (DOM.startTileDownloadBtn) {
+    DOM.startTileDownloadBtn.addEventListener('click', () => {
+      startOfflineDownload();
+    });
+  }
+}
+
+async function startOfflineDownload() {
+  if (isDownloadingTiles) return;
+
+  const center = MapController.map.getCenter();
+  const lat = center.lat;
+  const lng = center.lng;
+  const radiusKm = 5; // 5 km fixed radius select
+
+  const tasks = [];
+  const minZoom = 10;
+  const maxZoom = 15;
+
+  const latOffset = (radiusKm * 1000) / 111111;
+  const lonOffset = (radiusKm * 1000) / (111111 * Math.cos(lat * Math.PI / 180));
+
+  const minLat = lat - latOffset;
+  const maxLat = lat + latOffset;
+  const minLon = lng - lonOffset;
+  const maxLon = lng + lonOffset;
+
+  const layers = ['osm'];
+
+  for (let z = minZoom; z <= maxZoom; z++) {
+    const minX = Math.floor((minLon + 180) / 360 * Math.pow(2, z));
+    const maxX = Math.floor((maxLon + 180) / 360 * Math.pow(2, z));
+    const minY = Math.floor((1 - Math.log(Math.tan(maxLat * Math.PI / 180) + 1 / Math.cos(maxLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+    const maxY = Math.floor((1 - Math.log(Math.tan(minLat * Math.PI / 180) + 1 / Math.cos(minLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        // Calculate tile center degrees
+        const tileLon = x / Math.pow(2, z) * 360 - 180;
+        const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+        const tileLat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+
+        const distance = Geolocation.calculateDistance(lat, lng, tileLat, tileLon);
+        if (distance <= radiusKm * 1000 + 1000) {
+          layers.forEach(layer => {
+            tasks.push({ layer, z, x, y });
+          });
+        }
+      }
+    }
+  }
+
+  const totalTiles = tasks.length;
+  if (totalTiles === 0) {
+    alert('Keine Kartenkacheln im ausgewählten Bereich gefunden.');
+    return;
+  }
+
+  isDownloadingTiles = true;
+  downloadCancelRequested = false;
+  DOM.startTileDownloadBtn.disabled = true;
+  DOM.startTileDownloadBtn.style.background = '#8e8e93';
+
+  let downloadedCount = 0;
+  let errorCount = 0;
+
+  const updateProgress = () => {
+    const percent = Math.round((downloadedCount / totalTiles) * 100);
+    DOM.startTileDownloadBtn.innerHTML = `<i class="animate-spin" data-lucide="loader-2"></i> Lade Kacheln... ${percent}%`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  };
+
+  updateProgress();
+
+  const concurrency = 4;
+  const worker = async () => {
+    while (tasks.length > 0 && !downloadCancelRequested) {
+      const task = tasks.shift();
+      if (!task) break;
+
+      const { layer, z, x, y } = task;
+      
+      const alreadyCached = await OpfsTileStore.hasTile(layer, z, x, y);
+      if (alreadyCached) {
+        downloadedCount++;
+        if (downloadedCount % 5 === 0) updateProgress();
+        continue;
+      }
+
+      const url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const blob = await response.blob();
+          await OpfsTileStore.saveTile(layer, z, x, y, blob);
+        } else {
+          errorCount++;
+        }
+      } catch (err) {
+        errorCount++;
+      }
+
+      downloadedCount++;
+      updateProgress();
+    }
+  };
+
+  const pool = Array.from({ length: concurrency }, () => worker());
+  await Promise.all(pool);
+
+  isDownloadingTiles = false;
+  DOM.startTileDownloadBtn.disabled = false;
+  DOM.startTileDownloadBtn.style.background = '';
+  DOM.startTileDownloadBtn.innerHTML = `<i data-lucide="download"></i> Bereich herunterladen`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  if (downloadCancelRequested) {
+    alert('Kachel-Download abgebrochen.');
+    return;
+  }
+
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+  const updatedZones = await OpfsTileStore.saveCachedZone(lat, lng, radiusKm);
+  MapController.drawCachedZones(updatedZones);
+
+  DOM.offlineDownloadPanel.classList.add('hidden');
+  MapController.hideOfflineDownloadZone();
+
+  alert(`Download abgeschlossen! ${downloadedCount - errorCount} von ${totalTiles} Kacheln erfolgreich im Offline-Speicher (OPFS) gesichert.`);
+}
+
+/**
+ * OLED Akkusparmodus (Dark Tacho) Logic
+ */
+function toggleOledSaveMode(activate) {
+  State.oledSaveModeActive = activate;
+  if (activate) {
+    if (DOM.oledSaveScreen) DOM.oledSaveScreen.classList.remove('hidden');
+    // Stop Leaflet rendering animations or centering
+    // Force a re-run of navigation logic to render values immediately
+    if (State.lastUserPosition) {
+      updateNavigationLogic(State.lastUserPosition);
+    }
+  } else {
+    if (DOM.oledSaveScreen) DOM.oledSaveScreen.classList.add('hidden');
+    // Trigger map invalidation to paint Leaflet tiles cleanly again
+    setTimeout(() => {
+      MapController.map.invalidateSize();
+      if (State.lastUserPosition) {
+        MapController.map.panTo([State.lastUserPosition.lat, State.lastUserPosition.lng]);
+      }
+    }, 100);
+  }
+}
+
+function renderOledAkkusparmodusData(userPos, closestIndex, currentStep, nextStep, distToNext) {
+  if (!State.oledSaveModeActive) return;
+
+  const coords = State.calculatedRoute.coordinates;
+
+  // 1. Abbiegehinweis Text & Icon
+  if (currentStep) {
+    if (nextStep) {
+      const distanceToNextText = distToNext > 1000 
+        ? `In ${(distToNext / 1000).toFixed(1)} km` 
+        : `In ${Math.round(distToNext)} m`;
+
+      if (DOM.oledTurnDist) DOM.oledTurnDist.textContent = distanceToNextText;
+      if (DOM.oledTurnText) DOM.oledTurnText.textContent = currentStep.instruction;
+
+      const iconName = getNavigationIcon(currentStep.type);
+      if (DOM.oledTurnIcon) {
+        DOM.oledTurnIcon.setAttribute('data-lucide', iconName);
+      }
+    } else {
+      if (DOM.oledTurnDist) DOM.oledTurnDist.textContent = 'Ziel erreicht';
+      if (DOM.oledTurnText) DOM.oledTurnText.textContent = 'Du hast dein Ziel erreicht.';
+      if (DOM.oledTurnIcon) {
+        DOM.oledTurnIcon.setAttribute('data-lucide', 'check-circle');
+      }
+    }
+  }
+
+  // 2. Prognose-Board
+  let distLeftMeters = 0;
+  for (let i = closestIndex; i < coords.length - 1; i++) {
+    distLeftMeters += Geolocation.calculateDistance(coords[i][1], coords[i][0], coords[i+1][1], coords[i+1][0]);
+  }
+  const distLeftKm = distLeftMeters / 1000;
+  if (DOM.oledDistLeft) DOM.oledDistLeft.textContent = `${distLeftKm.toFixed(1)} km`;
+
+  const elevationArray = State.calculatedRoute.elevation;
+  let climbingLeft = 0;
+  if (elevationArray && elevationArray.length > closestIndex) {
+    for (let i = closestIndex; i < elevationArray.length - 1; i++) {
+      const diff = elevationArray[i+1] - elevationArray[i];
+      if (diff > 0) climbingLeft += diff;
+    }
+  }
+  if (DOM.oledElevationLeft) DOM.oledElevationLeft.textContent = `+${Math.round(climbingLeft)} hm`;
+
+  let speedKmh = userPos.speed ? (userPos.speed * 3.6) : 0;
+  if (speedKmh < 3) {
+    speedKmh = State.activeProfile === 'foot-hiking' ? 4 : 15;
+  }
+  const hoursLeft = distLeftKm / speedKmh;
+  const hours = Math.floor(hoursLeft);
+  const mins = Math.round((hoursLeft - hours) * 60);
+  if (DOM.oledTimeLeft) DOM.oledTimeLeft.textContent = `${hours > 0 ? hours + ' Std ' : ''}${mins} Min`;
+
+  // 3. Dynamic Compass Needle
+  if (nextStep) {
+    const nextStepStartCoord = coords[nextStep.way_points[0]];
+    const bearing = calculateBearing(
+      userPos.lat, userPos.lng,
+      nextStepStartCoord[1], nextStepStartCoord[0]
+    );
+
+    let rotateDeg = bearing;
+    if (State.currentBearing) {
+      rotateDeg = bearing - State.currentBearing;
+    }
+    if (DOM.oledCompassNeedle) {
+      DOM.oledCompassNeedle.style.transform = `rotate(${rotateDeg}deg)`;
+    }
+
+    let dirName = 'Norden';
+    if (bearing >= 22.5 && bearing < 67.5) dirName = 'Nord-Ost';
+    else if (bearing >= 67.5 && bearing < 112.5) dirName = 'Osten';
+    else if (bearing >= 112.5 && bearing < 157.5) dirName = 'Süd-Ost';
+    else if (bearing >= 157.5 && bearing < 202.5) dirName = 'Süden';
+    else if (bearing >= 202.5 && bearing < 247.5) dirName = 'Süd-West';
+    else if (bearing >= 247.5 && bearing < 292.5) dirName = 'Westen';
+    else if (bearing >= 292.5 && bearing < 337.5) dirName = 'Nord-West';
+
+    if (DOM.oledCompassText) DOM.oledCompassText.textContent = `${dirName} ${Math.round(bearing)}°`;
+  }
+
+  // 4. Draw Vector SVG route shape
+  const userCoords = [userPos.lng, userPos.lat];
+  const remainingCoords = coords.slice(closestIndex);
+  drawOledVectorTrack(userCoords, remainingCoords);
+}
+
+function drawOledVectorTrack(userCoords, remainingCoords) {
+  const svg = DOM.oledVectorSvg;
+  if (!svg) return;
+
+  svg.innerHTML = '';
+
+  const w = svg.clientWidth || 320;
+  const h = svg.clientHeight || 220;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+  if (!remainingCoords || remainingCoords.length === 0) return;
+
+  const pts = remainingCoords.slice(0, 30);
+  
+  let minLon = Infinity, maxLon = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity;
+
+  pts.forEach(p => {
+    if (p[0] < minLon) minLon = p[0];
+    if (p[0] > maxLon) maxLon = p[0];
+    if (p[1] < minLat) minLat = p[1];
+    if (p[1] > maxLat) maxLat = p[1];
+  });
+
+  if (userCoords) {
+    if (userCoords[0] < minLon) minLon = userCoords[0];
+    if (userCoords[0] > maxLon) maxLon = userCoords[0];
+    if (userCoords[1] < minLat) minLat = userCoords[1];
+    if (userCoords[1] > maxLat) maxLat = userCoords[1];
+  }
+
+  const lonSpan = maxLon - minLon;
+  const latSpan = maxLat - minLat;
+  const maxSpan = Math.max(lonSpan, latSpan) || 0.0001;
+
+  const pad = 30;
+  const scale = Math.min((w - pad * 2) / maxSpan, (h - pad * 2) / maxSpan);
+
+  const getSvgPixel = (lon, lat) => {
+    const ox = (lon - minLon) * scale;
+    const oy = (maxLat - lat) * scale;
+    const dx = (w - lonSpan * scale) / 2;
+    const dy = (h - latSpan * scale) / 2;
+    return { x: dx + ox, y: dy + oy };
+  };
+
+  let pathD = '';
+  pts.forEach((p, idx) => {
+    const { x, y } = getSvgPixel(p[0], p[1]);
+    if (idx === 0) pathD += `M ${x} ${y}`;
+    else pathD += ` L ${x} ${y}`;
+  });
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', pathD);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', '#FC5200');
+  path.setAttribute('stroke-width', '6');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('opacity', '0.85');
+  svg.appendChild(path);
+
+  if (userCoords) {
+    const up = getSvgPixel(userCoords[0], userCoords[1]);
+    
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('cx', up.x);
+    ring.setAttribute('cy', up.y);
+    ring.setAttribute('r', '14');
+    ring.setAttribute('fill', 'rgba(48, 209, 88, 0.25)');
+    
+    const pulseAnim = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    pulseAnim.setAttribute('attributeName', 'r');
+    pulseAnim.setAttribute('values', '6;16;6');
+    pulseAnim.setAttribute('dur', '2s');
+    pulseAnim.setAttribute('repeatCount', 'indefinite');
+    ring.appendChild(pulseAnim);
+    svg.appendChild(ring);
+
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', up.x);
+    dot.setAttribute('cy', up.y);
+    dot.setAttribute('r', '7');
+    dot.setAttribute('fill', '#30d158');
+    dot.setAttribute('stroke', '#ffffff');
+    dot.setAttribute('stroke-width', '2');
+    svg.appendChild(dot);
+  }
+}
+
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  let brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+/**
+ * Smart Weather Window (Open-Meteo Route Forecast)
+ */
+async function fetchRouteWeatherForecast(route) {
+  if (!route || !route.coordinates || route.coordinates.length < 2) return;
+
+  const coords = route.coordinates;
+  const numPoints = 5;
+  const selectedPoints = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const fraction = i / (numPoints - 1);
+    const index = Math.min(Math.floor(fraction * (coords.length - 1)), coords.length - 1);
+    
+    let distMeters = 0;
+    for (let j = 0; j < index; j++) {
+      distMeters += Geolocation.calculateDistance(coords[j][1], coords[j][0], coords[j+1][1], coords[j+1][0]);
+    }
+
+    selectedPoints.push({
+      lat: coords[index][1],
+      lon: coords[index][0],
+      distMeters: distMeters,
+      index: index
+    });
+  }
+
+  const speedMps = State.activeProfile === 'foot-hiking' ? 1.11 : 4.16; // 4 km/h vs 15 km/h
+  const lats = selectedPoints.map(p => p.lat.toFixed(5)).join(',');
+  const lons = selectedPoints.map(p => p.lon.toFixed(5)).join(',');
+  
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`;
+
+  try {
+    const response = await fetch(weatherUrl);
+    if (!response.ok) throw new Error('Weather API error');
+    
+    const data = await response.json();
+    const results = Array.isArray(data) ? data : [data];
+
+    const getForecastForTimeOffset = (timeShiftMinutes) => {
+      const now = new Date();
+      const forecasts = [];
+
+      selectedPoints.forEach((pt, idx) => {
+        const stationData = results[idx] || results[0];
+        if (!stationData || !stationData.hourly) return;
+
+        const travelDurationSec = pt.distMeters / speedMps;
+        const eta = new Date(now.getTime() + (timeShiftMinutes * 60 * 1000) + (travelDurationSec * 1000));
+        
+        const hourlyTimes = stationData.hourly.time;
+        let closestHourIndex = 0;
+        let minTimeDiff = Infinity;
+
+        hourlyTimes.forEach((tStr, hIdx) => {
+          const tDate = new Date(tStr);
+          const diff = Math.abs(tDate - eta);
+          if (diff < minTimeDiff) {
+            minTimeDiff = diff;
+            closestHourIndex = hIdx;
+          }
+        });
+
+        const hourly = stationData.hourly;
+        forecasts.push({
+          lat: pt.lat,
+          lon: pt.lon,
+          distMeters: pt.distMeters,
+          index: pt.index,
+          eta: eta,
+          temp: hourly.temperature_2m[closestHourIndex],
+          rainProb: hourly.precipitation_probability[closestHourIndex],
+          code: hourly.weather_code[closestHourIndex],
+          windSpeed: hourly.wind_speed_10m[closestHourIndex],
+          windDir: hourly.wind_direction_10m[closestHourIndex]
+        });
+      });
+
+      return forecasts;
+    };
+
+    const forecastCurrent = getForecastForTimeOffset(0);
+    const forecastEarlier = getForecastForTimeOffset(-30);
+    const forecastLater = getForecastForTimeOffset(30);
+
+    State.routeWeatherForecast = forecastCurrent;
+    analyzeWeatherWindows(forecastCurrent, forecastEarlier, forecastLater);
+
+    // Re-draw profile with weather dots
+    if (State.calculatedRoute) {
+      drawElevationProfile(State.calculatedRoute.coordinates);
+    }
+  } catch (err) {
+    console.error('Failed to fetch route weather:', err);
+  }
+}
+
+function analyzeWeatherWindows(current, earlier, later) {
+  const getPenaltyScore = (forecastArray) => {
+    let rainSum = 0;
+    let maxRain = 0;
+    forecastArray.forEach(f => {
+      rainSum += f.rainProb;
+      if (f.rainProb > maxRain) maxRain = f.rainProb;
+    });
+    return (rainSum / forecastArray.length) + maxRain;
+  };
+
+  const scoreCurrent = getPenaltyScore(current);
+  const scoreEarlier = getPenaltyScore(earlier);
+  const scoreLater = getPenaltyScore(later);
+
+  let recommendationText = "";
+  let iconHtml = '<i data-lucide="sun" style="width: 18px; height: 18px;"></i>';
+
+  if (scoreCurrent <= 15) {
+    recommendationText = "Perfektes Wetterfenster! Die Bedingungen für deine Route sind optimal.";
+    iconHtml = '<i data-lucide="sun" style="width: 18px; height: 18px; color: #f59e0b;"></i>';
+  } else if (scoreEarlier < scoreCurrent && scoreEarlier < scoreLater && (scoreCurrent - scoreEarlier) > 10) {
+    recommendationText = "Tipp: Starte 30 Minuten früher, um die Regenwahrscheinlichkeit auf deiner Route zu minimieren!";
+    iconHtml = '<i data-lucide="cloud-lightning" style="width: 18px; height: 18px; color: var(--color-primary);"></i>';
+  } else if (scoreLater < scoreCurrent && (scoreCurrent - scoreLater) > 10) {
+    recommendationText = "Tipp: Starte 30 Minuten später, um dem Regenschauer auf der Strecke auszuweichen.";
+    iconHtml = '<i data-lucide="cloud-rain" style="width: 18px; height: 18px; color: var(--color-primary);"></i>';
+  } else {
+    let currentWind = current.reduce((sum, f) => sum + f.windSpeed, 0) / current.length;
+    if (currentWind > 20) {
+      recommendationText = `Achtung: Erhöhte Windgeschwindigkeiten (ca. ${Math.round(currentWind)} km/h) auf der Strecke gemeldet.`;
+      iconHtml = '<i data-lucide="wind" style="width: 18px; height: 18px; color: #60a5fa;"></i>';
+    } else {
+      recommendationText = "Normale Wetterbedingungen entlang deiner Tour.";
+      iconHtml = '<i data-lucide="cloud" style="width: 18px; height: 18px; color: #9ca3af;"></i>';
+    }
+  }
+
+  const tipContainer = document.getElementById('weather-tip-container');
+  if (tipContainer) {
+    tipContainer.innerHTML = `
+      <div class="weather-tip-card">
+        ${iconHtml}
+        <div>
+          <div class="weather-tip-title">Smartes Wetterfenster</div>
+          <div class="weather-tip-desc">${recommendationText}</div>
+        </div>
+      </div>
+    `;
+    tipContainer.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+/**
+ * Smart Anti-Frust Re-Router (Forward Sub-routing Recalculation)
+ */
+let isReRouting = false;
+
+async function triggerBackgroundReRoute(userPos, closestIndex, targetIndex) {
+  if (isReRouting) return;
+  isReRouting = true;
+
+  console.log(`Off-Route! Triggering forward re-routing from closest index ${closestIndex} to target index ${targetIndex}...`);
+
+  const coords = State.calculatedRoute.coordinates;
+  const steps = State.calculatedRoute.steps;
+
+  const startPt = { lat: userPos.lat, lon: userPos.lng };
+  const endPt = { lat: coords[targetIndex][1], lon: coords[targetIndex][0] };
+
+  try {
+    const reRouteResult = await Routing.getRoute(
+      [startPt, endPt],
+      State.activeProfile,
+      State.routingEngine,
+      State.apiKey,
+      State.brouterOptions
+    );
+
+    if (reRouteResult && reRouteResult.coordinates && reRouteResult.coordinates.length > 0) {
+      const stitchedCoords = [
+        ...coords.slice(0, closestIndex),
+        ...reRouteResult.coordinates,
+        ...coords.slice(targetIndex + 1)
+      ];
+
+      let stitchedElevation = null;
+      if (State.calculatedRoute.elevation && reRouteResult.elevation) {
+        stitchedElevation = [
+          ...State.calculatedRoute.elevation.slice(0, closestIndex),
+          ...reRouteResult.elevation,
+          ...State.calculatedRoute.elevation.slice(targetIndex + 1)
+        ];
+      }
+
+      const indexDiff = reRouteResult.coordinates.length - (targetIndex - closestIndex + 1);
+
+      const pastSteps = steps.filter(step => step.way_points[1] < closestIndex);
+      const futureSteps = steps.filter(step => step.way_points[0] > targetIndex).map(step => {
+        return {
+          ...step,
+          way_points: [step.way_points[0] + indexDiff, step.way_points[1] + indexDiff]
+        };
+      });
+      const subSteps = reRouteResult.steps.map(step => {
+        return {
+          ...step,
+          way_points: [step.way_points[0] + closestIndex, step.way_points[1] + closestIndex]
+        };
+      });
+
+      const stitchedSteps = [...pastSteps, ...subSteps, ...futureSteps];
+
+      State.calculatedRoute.coordinates = stitchedCoords;
+      State.calculatedRoute.steps = stitchedSteps;
+      if (stitchedElevation) State.calculatedRoute.elevation = stitchedElevation;
+
+      let newTotalDist = 0;
+      for (let i = 0; i < stitchedCoords.length - 1; i++) {
+        newTotalDist += Geolocation.calculateDistance(stitchedCoords[i][1], stitchedCoords[i][0], stitchedCoords[i+1][1], stitchedCoords[i+1][0]);
+      }
+      State.calculatedRoute.stats.distance = newTotalDist / 1000;
+
+      MapController.clearRouteGraphics();
+      MapController.drawRoute(State.calculatedRoute.geojson, State.calculatedRoute.segments);
+      
+      if (!State.oledSaveModeActive) {
+        MapController.map.panTo([userPos.lat, userPos.lng]);
+      }
+
+      if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+      speakInstruction("Route wurde optimiert.");
+      showReRouteBannerAlert();
+    }
+  } catch (err) {
+    console.error('Anti-Frust Re-Router failed:', err);
+  } finally {
+    isReRouting = false;
+  }
+}
+
+function showReRouteBannerAlert() {
+  const alertEl = document.createElement('div');
+  alertEl.style.position = 'absolute';
+  alertEl.style.top = '145px';
+  alertEl.style.left = '50%';
+  alertEl.style.transform = 'translateX(-50%)';
+  alertEl.style.background = 'rgba(16, 185, 129, 0.95)';
+  alertEl.style.color = '#ffffff';
+  alertEl.style.padding = '8px 16px';
+  alertEl.style.borderRadius = '20px';
+  alertEl.style.fontWeight = 'bold';
+  alertEl.style.fontSize = '0.82rem';
+  alertEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  alertEl.style.zIndex = '3000';
+  alertEl.textContent = 'Route optimiert';
+
+  document.getElementById('app-container').appendChild(alertEl);
+
+  setTimeout(() => {
+    alertEl.style.transition = 'opacity 0.5s ease-out';
+    alertEl.style.opacity = '0';
+    setTimeout(() => alertEl.remove(), 500);
+  }, 2500);
 }

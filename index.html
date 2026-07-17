@@ -30,10 +30,13 @@
     
     <!-- Floating Search Bar -->
     <div id="floating-search-bar" class="glass">
-      <button id="hamburger-menu-btn" title="Menü öffnen">
-        <i data-lucide="menu"></i>
-      </button>
+      <div class="search-icon-left">
+        <i data-lucide="map-pin-search"></i>
+      </div>
       <input type="text" id="search-bar-input" placeholder="Wo soll es hingehen?" autocomplete="off">
+      <button id="user-menu-btn" title="Menü öffnen" class="user-circle-btn">
+        <i data-lucide="user-round"></i>
+      </button>
       <div id="search-bar-results" class="search-results-box hidden"></div>
     </div>
 
@@ -90,16 +93,12 @@
     <main id="map-container">
       <div id="map"></div>
 
-      <!-- Statistik-Ticker (UI) -->
-      <div id="map-stats-ticker" class="glass hidden" style="position: absolute; top: 16px; right: 16px; z-index: 1050; pointer-events: none; padding: 8px 14px; border-radius: 12px; font-family: inherit; font-weight: 700; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 2px;">
-        <span id="ticker-dist-val" style="font-size: 0.85rem; color: var(--text-main); display: block;">0.0 km</span>
-        <span id="ticker-elev-val" style="font-size: 0.72rem; color: var(--text-dimmed); display: block;">↑ 0m  ↓ 0m</span>
-      </div>
+
 
       <!-- Overpass Route Search Floating UI -->
-      <button id="search-map-routes-btn" title="Nach Wander- und Fahrradrouten im Kartenausschnitt suchen">
-        <i data-lucide="search" style="width: 15px; height: 15px;"></i>
-        <span>Bereich nach Routen durchsuchen</span>
+      <button id="search-map-routes-btn" title="Wander- und Fahrradrouten suchen">
+        <i data-lucide="radar" style="width: 16px; height: 16px;"></i>
+        <span>Routen finden</span>
       </button>
 
       <div id="overpass-routes-panel" class="hidden">
@@ -115,6 +114,31 @@
             <span>Suche Routen...</span>
           </div>
           <ul id="overpass-route-list-ul" class="overpass-route-list"></ul>
+        </div>
+      </div>
+
+      <!-- Offline Map Downloader Panel (floating) -->
+      <div id="offline-download-panel" class="glass hidden">
+        <div class="offline-download-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="download-cloud" style="color: var(--color-primary); width: 18px; height: 18px;"></i>
+            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-main);">Offline-Karten</h4>
+          </div>
+          <button id="close-offline-download-btn" title="Offline-Modus beenden" style="border: none; background: transparent; color: var(--text-dimmed); cursor: pointer; padding: 4px;">
+            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+        <div class="offline-download-body" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+          <p style="font-size: 0.82rem; color: var(--text-dimmed); margin: 0; line-height: 1.4;">
+            Positioniere den Kreis auf der Karte über deiner Wunschregion.
+          </p>
+          <div class="size-estimate-badge" style="background: rgba(252, 82, 0, 0.08); border: 1px dashed rgba(252, 82, 0, 0.3); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--color-primary); font-weight: 500;">
+            <i data-lucide="info" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+            <span>Bereich: ~5 km Radius (ca. 18 MB)</span>
+          </div>
+          <button id="start-tile-download-btn" class="btn btn-accent btn-full" style="background: var(--color-primary); border: none; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <i data-lucide="download"></i> Bereich herunterladen
+          </button>
         </div>
       </div>
 
@@ -176,6 +200,10 @@
           <span id="nav-instruction-dist" class="nav-dist">In 150m</span>
           <span id="nav-instruction-text" class="nav-text">Rechts abbiegen auf Waldweg</span>
         </div>
+        <button id="toggle-oled-save-btn" class="btn-oled-nav" title="Akkusparmodus" style="border: none; background: rgba(0, 0, 0, 0.25); color: var(--color-primary); cursor: pointer; padding: 8px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px; border: 1px solid rgba(252, 82, 0, 0.2); margin-right: 8px;">
+          <i data-lucide="battery-charging" style="width: 14px; height: 14px;"></i>
+          <span>Sparmodus</span>
+        </button>
         <button id="stop-nav-btn" class="btn-close-nav" title="Navigation beenden">
           <i data-lucide="x"></i>
         </button>
@@ -248,6 +276,11 @@
               <i data-lucide="wand-sparkles"></i> MagicTrack AI
             </button>
           </div>
+          <!-- Offline status badge -->
+          <div id="pwa-offline-status" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.78rem; color: var(--text-dimmed);">
+            <span class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #8e8e93; display: inline-block;"></span>
+            <span id="pwa-offline-text">Verbindung wird geprüft...</span>
+          </div>
         </div>
 
         <!-- ZUSTAND 2: Route berechnet (Tabs für Route & Einstellungen) -->
@@ -309,6 +342,9 @@
                 <div id="surface-list" class="surface-list"></div>
               </div>
 
+              <!-- Smart Weather Tip -->
+              <div id="weather-tip-container" class="hidden"></div>
+
               <!-- Höhenprofil -->
               <div class="elevation-profile-container" style="margin-top: 14px;">
                 <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Höhenprofil</h4>
@@ -339,12 +375,17 @@
                   </div>
                 </div>
 
-                <!-- GPX Export -->
-                <div class="action-buttons" style="margin-top: 14px; margin-bottom: 14px;">
-                  <button id="export-gpx-btn" class="btn btn-primary btn-full">
-                    <i data-lucide="download"></i> GPX exportieren
+                <!-- GPX Export & Teilen -->
+                <div class="action-buttons" style="margin-top: 14px; margin-bottom: 14px; display: flex; gap: 8px;">
+                  <button id="export-gpx-btn" class="btn btn-primary" style="flex: 1; padding: 10px 6px;">
+                    <i data-lucide="download"></i> GPX
+                  </button>
+                  <button id="share-trip-btn" class="btn btn-secondary" style="flex: 1; padding: 10px 6px;">
+                    <i data-lucide="share-2"></i> Teilen
                   </button>
                 </div>
+                <!-- Hidden Canvas for Trip Card generation -->
+                <canvas id="trip-card-canvas" style="display: none;"></canvas>
               </div>
             </div>
           </div>
@@ -514,10 +555,6 @@
                     <input type="checkbox" id="settings-toggle-tunnel" style="width: auto; margin: 0; cursor: pointer;">
                     <label for="settings-toggle-tunnel" style="font-size: 0.85rem; cursor: pointer; user-select: none;">Tunnel komplett meiden</label>
                   </div>
-                  <div class="toggle-row" style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="settings-toggle-beeline" style="width: auto; margin: 0; cursor: pointer;">
-                    <label for="settings-toggle-beeline" style="font-size: 0.85rem; cursor: pointer; user-select: none;">Luftlinie aktivieren (Beeline)</label>
-                  </div>
                 </div>
 
                 <!-- Höhenprofil-Feintuning -->
@@ -569,6 +606,11 @@
         <div class="form-group checkbox-group">
           <input type="checkbox" id="offline-tiles-checkbox" checked>
           <label for="offline-tiles-checkbox">Geladene Kartenkacheln offline speichern</label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="auto-reroute-checkbox">
+          <label for="auto-reroute-checkbox">Automatisches Re-Routing aktivieren</label>
         </div>
 
         <div class="form-group">
@@ -655,9 +697,14 @@
             </select>
           </div>
 
-          <button id="magic-generate-btn" class="btn btn-accent btn-full" style="margin-top: 16px; background: linear-gradient(135deg, #10b981 0%, #0b7a55 100%); border: none;">
+           <button id="magic-generate-btn" class="btn btn-accent btn-full" style="margin-top: 16px; background: linear-gradient(135deg, #10b981 0%, #0b7a55 100%); border: none;">
             <i data-lucide="sparkles"></i> Route generieren
           </button>
+          <!-- Offline check -->
+          <div id="magic-offline-indicator" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.72rem; color: var(--text-dimmed);">
+            <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #8e8e93; display: inline-block;"></span>
+            <span id="magic-offline-text">Magic Track offline bereit</span>
+          </div>
         </div>
 
         <!-- Step 2: Generating state -->
@@ -738,6 +785,65 @@
 
       </div>
     </div>
+  </div>
+
+    <!-- OLED Akkusparmodus Screen Overlay -->
+    <div id="oled-save-screen" class="hidden" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: #000000; z-index: 2000; color: #ffffff; display: flex; flex-direction: column; box-sizing: border-box; padding: 24px;">
+      <!-- Header: Turn-by-Turn action hint -->
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #222; padding-bottom: 16px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div id="oled-turn-icon-container" style="width: 64px; height: 64px; border-radius: 50%; background: #111; border: 2px solid var(--color-primary); display: flex; align-items: center; justify-content: center; color: var(--color-primary);">
+            <i id="oled-turn-icon" data-lucide="navigation" style="width: 34px; height: 34px;"></i>
+          </div>
+          <div>
+            <div id="oled-turn-dist" style="font-size: 2.2rem; font-weight: 800; line-height: 1.1;">In 150m</div>
+            <div id="oled-turn-text" style="font-size: 1.1rem; color: #aaa; margin-top: 4px;">Rechts abbiegen auf Waldweg</div>
+          </div>
+        </div>
+        <button id="exit-oled-btn" class="btn btn-secondary" style="border-radius: 20px; font-weight: bold; background: #222; border: 1px solid #444; color: #fff; padding: 10px 20px; font-size: 0.9rem;">
+          Karte anzeigen
+        </button>
+      </div>
+
+      <!-- Mid Section: Abstract Route Line (SVG Path) & Dynamic Compass -->
+      <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+        <!-- Dynamic SVG Vector Track -->
+        <svg id="oled-vector-svg" style="width: 100%; height: 220px; filter: drop-shadow(0 0 8px rgba(252, 82, 0, 0.45));"></svg>
+        
+        <!-- Rotating Compass Guidance -->
+        <div style="margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div id="oled-compass-needle" style="width: 60px; height: 60px; border-radius: 50%; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease-out;">
+            <i data-lucide="navigation" style="width: 32px; height: 32px; color: #ff3b30;"></i>
+          </div>
+          <div style="font-size: 0.95rem; color: #888; font-weight: 500; display: flex; gap: 6px; align-items: center;">
+            <i data-lucide="compass" style="width: 14px; height: 14px;"></i>
+            <span id="oled-compass-text">Nord-Ost 45°</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Prognose Board -->
+      <div style="border-top: 1px solid #222; padding-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center; margin-bottom: 24px; flex-shrink: 0;">
+        <div style="background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 12px; padding: 12px 6px;">
+          <div style="font-size: 0.72rem; font-weight: 700; color: #666; margin-bottom: 4px; letter-spacing: 0.5px;">RESTZEIT</div>
+          <div id="oled-time-left" style="font-size: 1.35rem; font-weight: 800; color: #fff;">--:-- Std.</div>
+        </div>
+        <div style="background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 12px; padding: 12px 6px;">
+          <div style="font-size: 0.72rem; font-weight: 700; color: #666; margin-bottom: 4px; letter-spacing: 0.5px;">RESTDISTANZ</div>
+          <div id="oled-dist-left" style="font-size: 1.35rem; font-weight: 800; color: var(--color-primary);">-- km</div>
+        </div>
+        <div style="background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 12px; padding: 12px 6px;">
+          <div style="font-size: 0.72rem; font-weight: 700; color: #666; margin-bottom: 4px; letter-spacing: 0.5px;">HÖHENMETER</div>
+          <div id="oled-elevation-left" style="font-size: 1.35rem; font-weight: 800; color: #30d158;">+0 hm</div>
+        </div>
+      </div>
+    </div>
+
+  <!-- Blocker screen for landscape orientation on mobile -->
+  <div id="orientation-blocker" class="glass">
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-smartphone-charging animate-rotate"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 17h.01"/><path d="m11 8 3 3-2 1 2 3"/></svg>
+    <p style="font-weight: 600; font-size: 1.1rem; margin-top: 16px;">Bitte drehe dein Gerät ins Hochformat</p>
+    <p style="font-size: 0.85rem; color: var(--text-dimmed); margin-top: 6px;">Vialo ist für das Hochformat optimiert.</p>
   </div>
 
   <!-- Leaflet JS -->
