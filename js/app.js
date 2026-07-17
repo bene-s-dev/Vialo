@@ -960,6 +960,17 @@ function setupEventListeners() {
 
   MapController.map.on('mouseup mousemove zoomstart dragstart', cancelPressTimer);
 
+  MapController.map.on('dragstart', () => {
+    if (State.gpsButtonState !== 0 || State.compassMode) {
+      State.gpsButtonState = 0;
+      State.isTracking = false;
+      State.compassMode = false;
+      MapController.setMapRotation(0);
+      _setGpsBtnIcon('locate-fixed', false);
+      if (DOM.gpsTrackBtn) DOM.gpsTrackBtn.title = 'Standort anzeigen';
+    }
+  });
+
   MapController.map.on('touchstart', (e) => {
     cancelPressTimer();
     if (e.latlng) {
@@ -2353,7 +2364,25 @@ function toggleGPSTracking() {
     DOM.gpsTrackBtn.title = 'Kompass-Modus aktivieren';
 
   } else if (s === 1) {
-    // ── State 1 → 2: compass on ────────────────────────────────
+    // ── State 1 → 2: check if located and centered ─────────────────
+    const pos = Geolocation.currentPosition || State.lastUserPosition;
+    if (!pos) {
+      return;
+    }
+
+    const lat = pos.coords ? pos.coords.latitude : pos.lat;
+    const lon = pos.coords ? pos.coords.longitude : pos.lng;
+    const mapCenter = MapController.map.getCenter();
+    const userLatLng = L.latLng(lat, lon);
+    const distance = mapCenter.distanceTo(userLatLng);
+
+    // If map is not centered (>= 15 meters), center the map first and do not enter compass mode
+    if (distance >= 15) {
+      MapController.map.flyTo([lat, lon], MapController.map.getZoom(), { animate: true, duration: 0.8 });
+      return;
+    }
+
+    // Map is centered, enable compass map rotation
     State.gpsButtonState = 2;
     State.compassMode = true;
     if (Geolocation.currentHeading !== null) {
