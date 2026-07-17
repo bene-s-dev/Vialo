@@ -421,35 +421,28 @@ export const MapController = {
   },
 
   /**
-   * Rotates the entire map to a given bearing (degrees, 0 = north).
-   * Rotates the tile/overlay pane and counter-rotates markers so they stay upright.
-   * @param {number} bearing Device heading in degrees
+   * Rotates the entire map by rotating the #map container element.
+   * This avoids coordinate-system drift caused by rotating individual panes.
+   * @param {number} bearing Device heading in degrees (0 = north)
    */
   setMapRotation(bearing) {
-    const angle = -bearing; // CSS rotates counter-clockwise, heading is CW from north
+    const container = this.map.getContainer();
+    const angle = -bearing; // negative: device points East (90°) → map rotates West
 
-    // Rotate the map container panes
-    const mapPane = this.map.getPane('mapPane');
-    if (mapPane) {
-      mapPane.style.transformOrigin = '50% 50%';
-      mapPane.style.transform = `rotate(${angle}deg)`;
-      mapPane.style.transition = 'transform 0.25s ease-out';
-    }
+    // Apply rotation to the whole container
+    container.style.transformOrigin = '50% 50%';
+    container.style.transition = 'transform 0.25s ease-out';
+    container.style.transform = bearing !== 0 ? `rotate(${angle}deg)` : '';
 
-    // Counter-rotate marker pane so icons stay upright
-    const markerPane = this.map.getPane('markerPane');
-    if (markerPane) {
-      markerPane.style.transformOrigin = '50% 50%';
-      markerPane.style.transform = `rotate(${-angle}deg)`;
-      markerPane.style.transition = 'transform 0.25s ease-out';
-    }
+    // Clear any previous pending invalidation
+    if (this._rotationTimer) clearTimeout(this._rotationTimer);
 
-    // Counter-rotate shadow pane too
-    const shadowPane = this.map.getPane('shadowPane');
-    if (shadowPane) {
-      shadowPane.style.transformOrigin = '50% 50%';
-      shadowPane.style.transform = `rotate(${-angle}deg)`;
-    }
+    this._rotationTimer = setTimeout(() => {
+      // Re-center on current position to prevent map drift after rotation
+      const center = this.map.getCenter();
+      this.map.invalidateSize({ animate: false });
+      this.map.panTo(center, { animate: false });
+    }, 260); // slightly after the CSS transition ends (250ms)
 
     this._currentBearing = bearing;
   }
