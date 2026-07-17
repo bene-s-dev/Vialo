@@ -838,6 +838,91 @@
 
 
 
+  <!-- Fullscreen Settings Page -->
+  <div id="settings-page" class="fullscreen-page hidden">
+    <header class="settings-page-header glass">
+      <button id="settings-page-back-btn" class="settings-back-btn" title="Zurück">
+        <i data-lucide="arrow-left"></i>
+      </button>
+      <h2>Einstellungen</h2>
+      <div style="width: 40px;"></div> <!-- Spacer to center title -->
+    </header>
+
+    <div class="settings-page-container">
+      <!-- Sidebar navigation for settings tabs -->
+      <aside class="settings-page-sidebar">
+        <button class="settings-tab-link active" data-tab="general">
+          <i data-lucide="settings-2"></i> Allgemein
+        </button>
+        <button class="settings-tab-link" data-tab="offline-maps">
+          <i data-lucide="map"></i> Offline-Karten
+        </button>
+        <button class="settings-tab-link" data-tab="about">
+          <i data-lucide="info"></i> Über Vialo
+        </button>
+      </aside>
+
+      <!-- Main content area for selected tab -->
+      <main class="settings-page-content glass">
+        <!-- Tab: General -->
+        <section id="settings-tab-general" class="settings-section active">
+          <h3>Allgemeine Einstellungen</h3>
+          
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="page-routing-engine-select" style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem;">Routing-Dienst</label>
+            <select id="page-routing-engine-select" style="background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.92rem; width: 100%;">
+              <option value="brouter" selected>BRouter (Empfohlen)</option>
+              <option value="ors">OpenRouteService</option>
+            </select>
+          </div>
+
+          <div class="form-group checkbox-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+            <input type="checkbox" id="page-offline-tiles-checkbox" checked style="width: auto; margin: 0; cursor: pointer;">
+            <label for="page-offline-tiles-checkbox" style="font-size: 0.92rem; cursor: pointer; user-select: none;">Geladene Kartenkacheln offline speichern</label>
+          </div>
+
+          <div class="form-group checkbox-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+            <input type="checkbox" id="page-auto-reroute-checkbox" style="width: auto; margin: 0; cursor: pointer;">
+            <label for="page-auto-reroute-checkbox" style="font-size: 0.92rem; cursor: pointer; user-select: none;">Automatisches Re-Routing aktivieren</label>
+          </div>
+        </section>
+
+        <!-- Tab: Offline Maps -->
+        <section id="settings-tab-offline-maps" class="settings-section">
+          <h3>Offline-Karten & Cache</h3>
+          <p class="settings-desc">Heruntergeladene Kacheln werden auf deinem Gerät gespeichert, damit du die Karte auch ohne Internetverbindung nutzen kannst.</p>
+          
+          <div class="cache-summary-card">
+            <div class="cache-stat">
+              <span class="label">Belegter Speicherplatz</span>
+              <span id="page-cache-size-label" class="value">Berechne...</span>
+            </div>
+            <button id="page-clear-cache-btn" class="btn btn-secondary btn-sm" style="border-radius: 8px; background: #222; border: 1px solid #444; color: #fff; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cache leeren</button>
+          </div>
+
+          <div class="offline-zones-section">
+            <h4 style="margin-bottom: 12px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">Gespeicherte Kartenausschnitte</h4>
+            <ul id="offline-zones-list" class="offline-zones-list">
+              <!-- Dynamically populated zones list -->
+            </ul>
+          </div>
+        </section>
+
+        <!-- Tab: About -->
+        <section id="settings-tab-about" class="settings-section">
+          <h3>Über Vialo</h3>
+          <p class="settings-desc" style="margin-bottom: 12px;">Version 1.0.0 (Premium shell-v15)</p>
+          <p class="settings-desc" style="margin-bottom: 24px;">Eine minimalistische PWA für Offline-Fahrrad- und Wandernavigation, entwickelt für maximale Energieeffizienz und Ausfallsicherheit.</p>
+          <div style="display: flex; justify-content: center; margin-top: 40px;">
+            <div style="background: rgba(141, 182, 0, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="compass" style="width: 48px; height: 48px; color: var(--color-secondary);"></i>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
   <!-- Leaflet JS -->
   <script src="js/leaflet.js"></script>
   
