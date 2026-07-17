@@ -1,5 +1,5 @@
 /**
- * Map Module for NaviApp
+ * Map Module for Vialo
  * Handles Leaflet initialization, layer management, marker rendering (using offline-friendly SVGs),
  * and route visualization.
  */

@@ -1,14 +1,14 @@
 /**
- * Storage Module for NaviApp
+ * Storage Module for Vialo
  * Manages saving API Keys and planned/imported routes in LocalStorage.
  */
 
 const STORAGE_KEYS = {
-  API_KEY: 'naviapp_ors_api_key',
-  SAVED_ROUTES: 'naviapp_saved_routes',
-  ROUTING_PREFS: 'naviapp_brouter_prefs',
-  ROUTING_ENGINE: 'naviapp_routing_engine',
-  ROUTING_OPTIONS: 'naviapp_brouter_options'
+  API_KEY: 'vialo_ors_api_key',
+  SAVED_ROUTES: 'vialo_saved_routes',
+  ROUTING_PREFS: 'vialo_brouter_prefs',
+  ROUTING_ENGINE: 'vialo_routing_engine',
+  ROUTING_OPTIONS: 'vialo_brouter_options'
 };
 
 export const Storage = {

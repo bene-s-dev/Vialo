@@ -1,5 +1,5 @@
 /**
- * GPX Module for NaviApp
+ * GPX Module for Vialo
  * Handles parsing GPX XML files into GeoJSON and exporting GeoJSON routes to GPX format.
  */
 
@@ -120,7 +120,7 @@ export const GPX = {
    * @param {string} routeName 
    * @returns {string} GPX XML String
    */
-  export(geojson, routeName = 'NaviApp Tour') {
+  export(geojson, routeName = 'Vialo Tour') {
     if (!geojson || !geojson.geometry || geojson.geometry.type !== 'LineString') {
       console.error('Invalid GeoJSON for GPX export');
       return '';
@@ -130,10 +130,10 @@ export const GPX = {
     const name = routeName.replace(/[&<>"']/g, ""); // escape XML chars
     
     let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    gpx += `<gpx version="1.1" creator="NaviApp" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+    gpx += `<gpx version="1.1" creator="Vialo" xmlns="http://www.topografix.com/GPX/1/1">\n`;
     gpx += `  <metadata>\n`;
     gpx += `    <name>${name}</name>\n`;
-    gpx += `    <desc>Erstellt mit NaviApp Fahrrad &amp; Wandernavigation</desc>\n`;
+    gpx += `    <desc>Erstellt mit Vialo Fahrrad &amp; Wandernavigation</desc>\n`;
     gpx += `    <time>${new Date().toISOString()}</time>\n`;
     gpx += `  </metadata>\n`;
     gpx += `  <trk>\n`;

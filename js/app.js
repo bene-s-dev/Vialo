@@ -1,5 +1,5 @@
 /**
- * Main Application Module (NaviApp)
+ * Main Application Module (Vialo)
  * Glues all controllers and views together.
  */
 
@@ -406,7 +406,7 @@ function loadSettings() {
   }
 
   // Set active profile from localstorage if saved previously
-  const savedProfile = localStorage.getItem('naviapp_active_profile');
+  const savedProfile = localStorage.getItem('vialo_active_profile');
   if (savedProfile) {
     State.activeProfile = savedProfile;
     // Update profile button UI
@@ -588,7 +588,7 @@ function setupEventListeners() {
   if (DOM.activityBikeBtn) {
     DOM.activityBikeBtn.addEventListener('click', () => {
       State.activeProfile = 'cycling-regular';
-      localStorage.setItem('naviapp_active_profile', 'cycling-regular');
+      localStorage.setItem('vialo_active_profile', 'cycling-regular');
       
       // Update BRouter options base profile
       State.brouterOptions.profile = 'cycling-regular';
@@ -613,7 +613,7 @@ function setupEventListeners() {
   if (DOM.activityFootBtn) {
     DOM.activityFootBtn.addEventListener('click', () => {
       State.activeProfile = 'foot-hiking';
-      localStorage.setItem('naviapp_active_profile', 'foot-hiking');
+      localStorage.setItem('vialo_active_profile', 'foot-hiking');
       
       // Update BRouter options base profile
       State.brouterOptions.profile = 'foot-hiking';
@@ -639,7 +639,7 @@ function setupEventListeners() {
     DOM.settingsProfileSelect.addEventListener('change', (e) => {
       const prof = e.target.value;
       State.activeProfile = prof;
-      localStorage.setItem('naviapp_active_profile', prof);
+      localStorage.setItem('vialo_active_profile', prof);
       
       // Update BRouter options
       State.brouterOptions.profile = prof;
@@ -1014,7 +1014,7 @@ function setupEventListeners() {
       State.activeProfile = activeBtn.dataset.profile;
       
       // Save profile choice locally
-      localStorage.setItem('naviapp_active_profile', State.activeProfile);
+      localStorage.setItem('vialo_active_profile', State.activeProfile);
       
       // Update BRouter options base profile
       State.brouterOptions.profile = State.activeProfile;
@@ -1789,7 +1789,7 @@ function exportGPXRoute() {
   
   const a = document.createElement('a');
   a.href = url;
-  a.download = `naviapp_route_${Date.now()}.gpx`;
+  a.download = `vialo_route_${Date.now()}.gpx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

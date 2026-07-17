@@ -205,5 +205,5 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`NaviApp Server running at http://127.0.0.1:${PORT}`);
+  console.log(`Vialo Server running at http://127.0.0.1:${PORT}`);
 });

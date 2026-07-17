@@ -1,5 +1,5 @@
 /**
- * Routing Module for NaviApp
+ * Routing Module for Vialo
  * Interfaces with OpenRouteService for directions & surface details
  * and Nominatim (OpenStreetMap) for geocoding address search.
  */
@@ -87,7 +87,7 @@ export const Routing = {
       const response = await fetch(url, {
         headers: {
           'Accept-Language': 'de,en',
-          'User-Agent': 'NaviApp-Client' // required by Nominatim usage policy
+          'User-Agent': 'Vialo-Client' // required by Nominatim usage policy
         }
       });
       if (!response.ok) throw new Error('Nominatim returned error ' + response.status);
@@ -155,7 +155,7 @@ export const Routing = {
       const response = await fetch(url, {
         headers: {
           'Accept-Language': 'de,en',
-          'User-Agent': 'NaviApp-Client'
+          'User-Agent': 'Vialo-Client'
         }
       });
       if (!response.ok) throw new Error('Nominatim reverse returned error ' + response.status);
@@ -607,7 +607,7 @@ export const Routing = {
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'NaviApp-Client'
+          'User-Agent': 'Vialo-Client'
         }
       });
       if (!response.ok) throw new Error('Nominatim reverse failed');

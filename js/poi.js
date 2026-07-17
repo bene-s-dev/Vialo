@@ -1,5 +1,5 @@
 /**
- * POI Module for NaviApp
+ * POI Module for Vialo
  * Interfaces with the OpenStreetMap Overpass API to query POIs in the map's current bounding box.
  */
 

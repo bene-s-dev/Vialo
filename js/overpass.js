@@ -1,5 +1,5 @@
 /**
- * Overpass API Client Module for NaviApp
+ * Overpass API Client Module for Vialo
  * Performs bounding box search for OSM hiking & cycling relations
  * and parses way geometries for direct Leaflet rendering.
  * Features automatic server failover for high reliability.
@@ -15,7 +15,7 @@ const OVERPASS_SERVERS = [
 /**
  * Robust fetch helper that automatically tries fallback servers in sequence on timeout or error
  */
-async function fetchFromOverpass(query, id = 'NaviApp-RouteFinder-v1.0') {
+async function fetchFromOverpass(query, id = 'Vialo-RouteFinder-v1.0') {
   let lastError = null;
   for (const server of OVERPASS_SERVERS) {
     const url = `${server}?data=${encodeURIComponent(query)}&id=${encodeURIComponent(id)}`;

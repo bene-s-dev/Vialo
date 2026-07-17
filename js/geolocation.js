@@ -1,5 +1,5 @@
 /**
- * Geolocation Module for NaviApp
+ * Geolocation Module for Vialo
  * Handles GPS tracking, compass heading, permissions, and route navigation logic.
  * Also includes a Route Simulator for demonstration and development purposes.
  */
