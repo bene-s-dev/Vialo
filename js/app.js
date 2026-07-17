@@ -45,7 +45,9 @@ const State = {
   lastSpokenStepIndex: -1,
   stepNearAnnounced: false,
   oledSaveModeActive: false,
-  autoReRoutingEnabled: false
+  autoReRoutingEnabled: false,
+  sheetStatePushed: false,
+  routeStatePushed: false
 };
 
 // DOM Elements
@@ -146,7 +148,6 @@ const DOM = {
   userMenuBtn: document.getElementById('user-menu-btn'),
   searchBarInput: document.getElementById('search-bar-input'),
   searchBarResults: document.getElementById('search-bar-results'),
-  mapUndoBtn: document.getElementById('map-undo-btn'),
   offlineMapsBtn: document.getElementById('offline-maps-btn'),
 
   // Bottom Sheet Containers
@@ -1770,6 +1771,7 @@ function updateRouteUI(route) {
   DOM.sheetSummaryDist.textContent = formattedDist;
   DOM.sheetSummaryDur.textContent = formattedDur;
   DOM.sheetActionBtn.classList.remove('hidden');
+  if (DOM.clearBtn) DOM.clearBtn.classList.add('active');
 
   // Update map stats ticker
   if (DOM.mapStatsTicker) {
@@ -1881,6 +1883,7 @@ function clearRoute() {
   DOM.startInput.value = '';
   DOM.destInput.value = '';
   if (DOM.searchBarInput) DOM.searchBarInput.value = '';
+  if (DOM.clearBtn) DOM.clearBtn.classList.remove('active');
   
   DOM.routeInfoSection.classList.add('hidden');
   DOM.longPressActions.classList.add('hidden');
@@ -1894,6 +1897,16 @@ function clearRoute() {
   DOM.sheetSummaryDist.textContent = '0.0 km';
   DOM.sheetSummaryDur.textContent = '00:00';
   DOM.bottomSheet.classList.remove('half-open', 'fully-open');
+
+  // Go back in history if we have pushed states
+  let backCount = 0;
+  if (State.sheetStatePushed) backCount++;
+  if (State.routeStatePushed) backCount++;
+  if (backCount > 0) {
+    State.sheetStatePushed = false;
+    State.routeStatePushed = false;
+    history.go(-backCount);
+  }
 
   // Show planning and hide results container
   DOM.sheetPlanningContainer.classList.remove('hidden');
@@ -2668,160 +2681,230 @@ function setupBottomSheetGestures() {
   let startTranslateY = 0;
   let H = 0;
   let dragging = false;
+  let contentDragActive = false;
 
   // ── History state management ──────────────────────────────────────
   // Level 1: sheet is open  → state { sheetOpen: true }
   // Level 2: route exists   → state { routeActive: true }
   // Back gesture pops one level at a time.
 
-  let sheetStatePushed = false;
-  let routeStatePushed = false;
-
   /** Push a history entry to intercept the next back gesture for the sheet */
   function pushSheetState() {
-    if (!sheetStatePushed) {
+    if (!State.sheetStatePushed) {
       history.pushState({ sheetOpen: true }, '');
-      sheetStatePushed = true;
+      State.sheetStatePushed = true;
     }
   }
 
   /** Push a history entry to intercept the next back gesture for the route */
   function pushRouteState() {
-    if (!routeStatePushed) {
+    if (!State.routeStatePushed) {
       history.pushState({ routeActive: true }, '');
-      routeStatePushed = true;
+      State.routeStatePushed = true;
     }
   }
 
   // Called by external code when a route has been calculated
   window._backGesture_pushRouteState = () => pushRouteState();
 
+  function onBottomSheetOpened() {
+    // Turn off compass function when sheet is open, set map to North
+    if (State.compassMode) {
+      State.compassMode = false;
+      if (State.gpsButtonState === 2) {
+        State.gpsButtonState = 1;
+      }
+      MapController.setMapRotation(0);
+      _setGpsBtnIcon('compass', false);
+      if (DOM.gpsTrackBtn) DOM.gpsTrackBtn.title = 'Kompass-Modus aktivieren';
+    } else {
+      MapController.setMapRotation(0);
+    }
+  }
+
   window.addEventListener('popstate', (e) => {
     const state = e.state || {};
 
     if (state.sheetOpen) {
-      // Level 1: close the sheet
-      DOM.bottomSheet.classList.remove('fully-open', 'half-open');
-      sheetStatePushed = false;
+      // The new state is that the sheet is open
+      DOM.bottomSheet.classList.add('fully-open');
+      State.sheetStatePushed = true;
+      onBottomSheetOpened();
     } else if (state.routeActive) {
-      // Level 2: clear the route
-      clearRoute();
-      routeStatePushed = false;
+      // The new state is that only the route is active (sheet is closed)
+      DOM.bottomSheet.classList.remove('fully-open');
+      State.sheetStatePushed = false;
     } else {
-      // Fallback: if sheet is open, close it; else clear route
-      if (DOM.bottomSheet.classList.contains('half-open') || DOM.bottomSheet.classList.contains('fully-open')) {
-        DOM.bottomSheet.classList.remove('fully-open', 'half-open');
-        sheetStatePushed = false;
-      } else if (State.routePoints.length > 0 || State.calculatedRoute) {
-        clearRoute();
-        routeStatePushed = false;
-      }
+      // The new state is the base state (no route, sheet closed)
+      DOM.bottomSheet.classList.remove('fully-open');
+      clearRoute();
+      State.sheetStatePushed = false;
+      State.routeStatePushed = false;
     }
   });
 
-
-  function openBottomSheet(mode = 'half') {
-    if (mode === 'half') {
-      DOM.bottomSheet.classList.add('half-open');
-      DOM.bottomSheet.classList.remove('fully-open');
-    } else {
-      DOM.bottomSheet.classList.add('fully-open');
-      DOM.bottomSheet.classList.remove('half-open');
-    }
+  function openBottomSheet() {
+    DOM.bottomSheet.classList.add('fully-open');
+    DOM.bottomSheet.classList.remove('half-open');
     pushSheetState();
+    onBottomSheetOpened();
   }
 
   function closeBottomSheet() {
     DOM.bottomSheet.classList.remove('fully-open', 'half-open');
-    sheetStatePushed = false;
+    if (State.sheetStatePushed) {
+      State.sheetStatePushed = false;
+      history.back();
+    }
   }
 
-  const dragTargets = [DOM.bottomSheetHandle, DOM.bottomSheet.querySelector('.sheet-summary')];
-  
+  const header = DOM.bottomSheet.querySelector('.bottom-sheet-header');
+  const content = DOM.bottomSheet.querySelector('.bottom-sheet-content');
+
+  function getCollapsedHeight() {
+    return 68; // Height of handle + header
+  }
+
+  function setTranslateY(y, animate = false) {
+    if (animate) {
+      DOM.bottomSheet.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    } else {
+      DOM.bottomSheet.style.transition = 'none';
+    }
+    DOM.bottomSheet.style.transform = y !== null ? `translateY(${y}px)` : '';
+  }
+
+  // 1. Dragging on Handle/Header
+  const dragTargets = [DOM.bottomSheetHandle, header];
   dragTargets.forEach(target => {
     if (!target) return;
-    
+
     target.addEventListener('touchstart', (e) => {
       startY = e.touches[0].clientY;
       H = DOM.bottomSheet.getBoundingClientRect().height;
-      
+      const collapsedY = H - getCollapsedHeight();
+
       if (DOM.bottomSheet.classList.contains('fully-open')) {
         startTranslateY = 0;
-      } else if (DOM.bottomSheet.classList.contains('half-open')) {
-        startTranslateY = H - 240;
       } else {
-        startTranslateY = H - 76;
+        startTranslateY = collapsedY;
       }
-      
-      DOM.bottomSheet.style.transition = 'none';
       dragging = true;
+      setTranslateY(startTranslateY, false);
     });
 
     target.addEventListener('touchmove', (e) => {
       if (!dragging) return;
       const currentY = e.touches[0].clientY;
-      const deltaY = currentY - startY; 
-      
+      const deltaY = currentY - startY;
+      const collapsedY = H - getCollapsedHeight();
+
       let newTranslateY = startTranslateY + deltaY;
-      newTranslateY = Math.max(0, Math.min(H - 76, newTranslateY));
-      
-      DOM.bottomSheet.style.transform = `translateY(${newTranslateY}px)`;
+      // Clamp between 0 (fully open) and collapsedY
+      newTranslateY = Math.max(0, Math.min(collapsedY, newTranslateY));
+      setTranslateY(newTranslateY, false);
     });
 
     target.addEventListener('touchend', (e) => {
       if (!dragging) return;
       dragging = false;
-      
-      DOM.bottomSheet.style.transition = '';
-      DOM.bottomSheet.style.transform = '';
-      
+
       const endY = e.changedTouches[0].clientY;
-      const deltaY = endY - startY; 
-      const newTranslateY = Math.max(0, Math.min(H - 76, startTranslateY + deltaY));
-      
-      if (deltaY > 80) {
-        if (DOM.bottomSheet.classList.contains('fully-open')) {
-          openBottomSheet('half');
+      const deltaY = endY - startY;
+      const collapsedY = H - getCollapsedHeight();
+      const newTranslateY = Math.max(0, Math.min(collapsedY, startTranslateY + deltaY));
+
+      // Reset transform so classes take over
+      setTranslateY(null, false);
+
+      // Determine final state based on threshold
+      if (Math.abs(deltaY) > 80) {
+        if (deltaY > 0) {
+          closeBottomSheet();
+        } else {
+          openBottomSheet();
+        }
+      } else {
+        // Snap to closest
+        if (newTranslateY < collapsedY / 2) {
+          openBottomSheet();
         } else {
           closeBottomSheet();
         }
-        return;
-      }
-      
-      if (deltaY < -80) {
-        if (DOM.bottomSheet.classList.contains('half-open')) {
-          openBottomSheet('full');
-        } else {
-          openBottomSheet('half');
-        }
-        return;
-      }
-
-      const distClosed = Math.abs(newTranslateY - (H - 76));
-      const distHalf = Math.abs(newTranslateY - (H - 240));
-      const distFull = Math.abs(newTranslateY - 0);
-      
-      const minDist = Math.min(distClosed, distHalf, distFull);
-      if (minDist === distClosed) {
-        closeBottomSheet();
-      } else if (minDist === distHalf) {
-        openBottomSheet('half');
-      } else {
-        openBottomSheet('full');
       }
     });
   });
 
-  DOM.bottomSheetHandle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (!DOM.bottomSheet.classList.contains('half-open') && !DOM.bottomSheet.classList.contains('fully-open')) {
-      openBottomSheet('half');
-    } else if (DOM.bottomSheet.classList.contains('half-open')) {
-      openBottomSheet('full');
-    } else {
-      closeBottomSheet();
-    }
-  });
+  // 2. Scroll-down-to-collapse on Content Area
+  if (content) {
+    content.addEventListener('touchstart', (e) => {
+      // Only trigger if at the top of scrollable content
+      if (content.scrollTop === 0 && DOM.bottomSheet.classList.contains('fully-open')) {
+        startY = e.touches[0].clientY;
+        H = DOM.bottomSheet.getBoundingClientRect().height;
+        contentDragActive = true;
+        dragging = false;
+      } else {
+        contentDragActive = false;
+      }
+    }, { passive: true });
+
+    content.addEventListener('touchmove', (e) => {
+      if (!contentDragActive) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // If dragging down (deltaY > 0), intercept scroll and drag sheet instead
+      if (deltaY > 0) {
+        if (e.cancelable) e.preventDefault();
+        dragging = true;
+        const collapsedY = H - getCollapsedHeight();
+        const newTranslateY = Math.max(0, Math.min(collapsedY, deltaY));
+        setTranslateY(newTranslateY, false);
+      } else {
+        // If dragging up, let native scroll happen
+        dragging = false;
+        setTranslateY(null, false);
+        contentDragActive = false;
+      }
+    }, { passive: false });
+
+    content.addEventListener('touchend', (e) => {
+      if (!contentDragActive || !dragging) {
+        contentDragActive = false;
+        dragging = false;
+        return;
+      }
+
+      contentDragActive = false;
+      dragging = false;
+
+      const endY = e.changedTouches[0].clientY;
+      const deltaY = endY - startY;
+      const collapsedY = H - getCollapsedHeight();
+
+      setTranslateY(null, false);
+
+      if (deltaY > 100) {
+        closeBottomSheet();
+      } else {
+        openBottomSheet();
+      }
+    });
+  }
+
+  // Handle click on handle to toggle
+  if (DOM.bottomSheetHandle) {
+    DOM.bottomSheetHandle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (DOM.bottomSheet.classList.contains('fully-open')) {
+        closeBottomSheet();
+      } else {
+        openBottomSheet();
+      }
+    });
+  }
 }
 
 /**

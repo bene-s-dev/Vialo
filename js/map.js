@@ -479,18 +479,8 @@ export const MapController = {
 
     // Apply rotation to the whole container
     container.style.transformOrigin = '50% 50%';
-    container.style.transition = 'transform 0.25s ease-out';
+    container.style.transition = 'transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     container.style.transform = bearing !== 0 ? `rotate(${angle}deg)` : '';
-
-    // Clear any previous pending invalidation
-    if (this._rotationTimer) clearTimeout(this._rotationTimer);
-
-    this._rotationTimer = setTimeout(() => {
-      // Re-center on current position to prevent map drift after rotation
-      const center = this.map.getCenter();
-      this.map.invalidateSize({ animate: false });
-      this.map.panTo(center, { animate: false });
-    }, 260); // slightly after the CSS transition ends (250ms)
 
     this._currentBearing = bearing;
   },

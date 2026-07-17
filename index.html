@@ -40,10 +40,7 @@
       <div id="search-bar-results" class="search-results-box hidden"></div>
     </div>
 
-    <!-- Floating Undo Button for Clean Map Mode -->
-    <button id="map-undo-btn" class="glass hidden" title="Letzten Punkt entfernen">
-      <i data-lucide="undo-2"></i> Schritt zurück
-    </button>
+
 
     <!-- Sidebar / Panel for Desktop & Mobile Toggle -->
     <aside id="sidebar" class="glass">
@@ -213,16 +210,16 @@
     <!-- Bottom Sheet (Draggable Drawer for Info/Navigation/Settings) -->
     <div id="bottom-sheet" class="glass">
       <div class="bottom-sheet-handle"></div>
+      <div class="bottom-sheet-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--color-border); cursor: grab; user-select: none;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Routenplaner</h3>
+        <button id="clear-route-btn" class="btn-round-reset" title="Zurücksetzen">
+          <i data-lucide="rotate-ccw" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
       <div class="bottom-sheet-content">
         
         <!-- ZUSTAND 1: Planungs-Modus -->
         <div id="sheet-planning-container" class="sheet-section">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Routenplanung</h3>
-            <button id="clear-route-btn" class="btn-round-reset" title="Zurücksetzen">
-              <i data-lucide="rotate-ccw" style="width: 16px; height: 16px;"></i>
-            </button>
-          </div>
 
           <!-- Long-Press Actions Container (Normally Hidden) -->
           <div id="long-press-actions" class="glass hidden" style="margin-bottom: 12px; padding: 12px; border-radius: 10px; border: 1px dashed var(--color-primary);">
@@ -839,12 +836,7 @@
       </div>
     </div>
 
-  <!-- Blocker screen for landscape orientation on mobile -->
-  <div id="orientation-blocker" class="glass">
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-smartphone-charging animate-rotate"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 17h.01"/><path d="m11 8 3 3-2 1 2 3"/></svg>
-    <p style="font-weight: 600; font-size: 1.1rem; margin-top: 16px;">Bitte drehe dein Gerät ins Hochformat</p>
-    <p style="font-size: 0.85rem; color: var(--text-dimmed); margin-top: 6px;">Vialo ist für das Hochformat optimiert.</p>
-  </div>
+
 
   <!-- Leaflet JS -->
   <script src="js/leaflet.js"></script>
