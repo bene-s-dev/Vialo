@@ -589,9 +589,6 @@ body, html {
 
 /* Fix gaps/seams between Leaflet tiles during zoom/rotation */
 .leaflet-tile {
-  outline: 1px solid transparent;
-  margin: -0.5px !important;
-  padding: 0.5px !important;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }

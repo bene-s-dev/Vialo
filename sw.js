@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vialo-shell-v19';
+const CACHE_NAME = 'vialo-shell-v20';
 const TILE_CACHE_NAME = 'vialo-tiles-v1';
 
 const ASSETS_TO_CACHE = [
