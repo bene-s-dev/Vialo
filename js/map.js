@@ -18,21 +18,16 @@ const MARKER_SVGS = {
     </svg>`,
   userBike: `
     <div class="user-position-marker">
-      <div class="pulse" style="background: rgba(0, 122, 255, 0.4);"></div>
-      <div style="background: #007AFF; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); position: relative; z-index: 2;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #FFFFFF; display: block;">
-          <path d="M19.5 14c-1.9 0-3.5 1.6-3.5 3.5s1.6 3.5 3.5 3.5 3.5-1.6 3.5-3.5-1.6-3.5-3.5-3.5zm0 6c-1.4 0-2.5-1.1-2.5-2.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5-1.1 2.5-2.5 2.5zM4.5 14C2.6 14 1 15.6 1 17.5S2.6 21 4.5 21 8 19.4 8 17.5 6.4 14 4.5 14zm0 6C3.1 20 2 18.9 2 17.5S3.1 15 4.5 15 7 16.1 7 17.5 5.9 20 4.5 20zm9.3-8.8l-1.3-2.6C12.2 8.1 11.7 8 11.2 8H8.5c-.3 0-.5.2-.5.5s.2.5.5.5h2.4c.2 0 .4.1.5.2l1.1 2.2-2.8 3.6H6.5c-.3 0-.5.2-.5.5s.2.5.5.5h3.5c.2 0 .4-.1.5-.2l2.6-3.4 1.2 2.4c.1.2.3.3.5.3H17c.3 0 .5-.2.5-.5s-.2-.5-.5-.5h-1.9l-1.3-2.6z" />
-        </svg>
+      <div class="pulse" style="background: rgba(0, 122, 255, 0.25);"></div>
+      <div class="marker-icon-wrapper">
+        <i data-lucide="bike" style="color: #007AFF; width: 28px; height: 28px;"></i>
       </div>
     </div>`,
   userHiking: `
     <div class="user-position-marker">
-      <div class="pulse" style="background: rgba(141, 182, 0, 0.4);"></div>
-      <div style="background: #8DB600; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); position: relative; z-index: 2;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color: #FFFFFF; display: block;">
-          <circle cx="12" cy="4" r="2.5" />
-          <path d="M13.5 7.5c-.3-.3-.8-.5-1.2-.5H10.5c-1.1 0-2 .9-2 2v4.5c0 .3.2.5.5.5s.5-.2.5-.5V9.5h1.2v6.2l-2.2 4.4c-.1.2-.1.5.1.7.1.1.2.1.3.1.2 0 .4-.1.5-.3l2.1-4.2V21c0 .3.2.5.5.5s.5-.2.5-.5v-4.8l2-2.5c.2-.2.2-.5.1-.7l-1.6-3.2 1.4-2.8 1.8 1.8c.2.2.5.2.7 0 .2-.2.2-.5 0-.7L13.5 7.5z" />
-        </svg>
+      <div class="pulse" style="background: rgba(141, 182, 0, 0.25);"></div>
+      <div class="marker-icon-wrapper">
+        <i data-lucide="person-standing" style="color: #8DB600; width: 28px; height: 28px;"></i>
       </div>
     </div>`,
   drinking_water: `
@@ -339,6 +334,17 @@ export const MapController = {
     } else {
       this.markers.user = L.marker(latlng, { icon: userIcon, zIndexOffset: 2000 }).addTo(this.map);
     }
+
+    // Trigger Lucide to render the dynamic elements in the marker
+    setTimeout(() => {
+      if (typeof lucide !== 'undefined') {
+        const container = this.map.getContainer();
+        lucide.createIcons({
+          attrs: { 'stroke-width': '2.5' },
+          nodes: container.querySelectorAll('.user-position-marker [data-lucide]')
+        });
+      }
+    }, 50);
 
     if (centerMap) {
       // Zoom in closer if it was zoomed out
